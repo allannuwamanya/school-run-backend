@@ -42,9 +42,41 @@ This document keeps track of all completed components, database schemas, backgro
 
 ---
 
-## 🛠 Next Phase Checklist (API Views & Controllers)
-- [ ] Implement DRF JWT authentication views (SimpleJWT) for driver & parent login endpoints.
-- [ ] Build `/api/children/` endpoints to register and list child profiles + weekly schedules.
-- [ ] Build `/api/dashboard/` for parents to track timeline status updates (stops GPS check-in history).
-- [ ] Build `/api/manifest/` for drivers to load active trip sequences and record one-shot GPS events.
-- [ ] Wire up SMS (EgoSMS) and Web Push (FCM) dispatch events to stop status transitions.
+## 📅 Version 1.1.0 (Phase 1 API — Frontend Contract)
+*Status: Deployed — All Phase 1 Endpoints Live*
+
+### 🔌 API Endpoints Added (`api/views.py`, `api/serializers.py`)
+* **[Added]** Auth endpoints (`/api/auth/register`, `/api/auth/login`, `/api/auth/refresh`):
+  * Phone-based registration and login returning JWT `{ access, refresh, user }`.
+  * `Parent` profile auto-created on registration with `emergency_contact`.
+* **[Added]** Account endpoint (`GET/PATCH /api/me`):
+  * Returns `{ user, is_verified, preferences }` with full_name and preference updates.
+* **[Added]** Schools endpoint (`GET /api/schools?q=`):
+  * Searchable school lookup returning `{ id, name, address, point }`.
+* **[Added]** Children CRUD endpoints (`GET/POST /api/children`, `GET/PATCH/DELETE /api/children/{id}`):
+  * Full child profile management with school association and pickup geolocation.
+* **[Added]** Schedule endpoint (`PUT /api/children/{id}/schedule`):
+  * Weekly schedule with morning/afternoon times and ISO weekday array.
+* **[Added]** Parent dashboard (`GET /api/dashboard`):
+  * Aggregates each child's today status (trip direction, stop status, ETA, position, last GPS event).
+  * Includes assigned driver info (name, plate, phone, rating).
+* **[Added]** Parent driver info (`GET /api/parent/driver`):
+  * Returns assigned driver details and document verification status.
+* **[Added]** Driver manifest (`GET /api/driver/manifest?date=`):
+  * Returns trip list with ordered stops, child info, and summary.
+* **[Added]** Trip actions (`POST /api/driver/trips/{id}/start`, `/api/driver/trips/{id}/complete`):
+  * Status transitions from SCHEDULED → IN_PROGRESS → COMPLETED.
+* **[Added]** Stop actions (`POST /api/stops/{id}/pickup|dropoff|no-show`):
+  * One-shot GPS capture with haversine distance verification against target pin.
+  * Auto-promotes next stop to `NEXT` status.
+  * Creates `Notification` record for the child's parent on pickup/dropoff.
+* **[Added]** History endpoint (`GET /api/history?type=`):
+  * Paginated ride history from completed trips.
+* **[Added]** Notifications endpoints (`GET /api/notifications`, `POST /api/notifications/read`):
+  * List and batch-mark-read with `all` or `ids` support.
+* **[Added]** Device registration (`POST /api/devices`):
+  * FCM push token registration stub.
+
+### 📝 Documentation
+* **[Added]** Full API endpoint reference to `README.md` with method, path, and auth requirements.
+* **[Updated]** `CHANGELOG.md` tracking all Phase 1 API deliveries.
