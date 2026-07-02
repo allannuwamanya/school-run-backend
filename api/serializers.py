@@ -1,4 +1,4 @@
-from datetime import date as date_today
+from datetime import date
 
 from rest_framework import serializers
 from django.contrib.auth import authenticate
@@ -419,4 +419,4 @@ class DeviceSerializer(serializers.Serializer):
 
 
 def today_date():
-    return date_today()
+    return date.today()
