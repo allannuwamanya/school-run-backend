@@ -64,22 +64,21 @@ def custom_exception_handler(exc, context):
         error_details = response.data
 
         if isinstance(response.data, dict):
+            if 'detail' in response.data:
+                result['detail'] = response.data['detail']
             for key, value in response.data.items():
                 if isinstance(value, list):
                     for msg in value:
-                        # ** THE FIX IS HERE **
-                        # Check if msg is a string before calling .lower()
                         if isinstance(msg, str):
                             result['errors'].append(
                                 f"The {key} is {msg.lower()}.")
                         else:
-                            # If not a string, convert it to one
                             result['errors'].append(
                                 f"The {key} has an issue: {str(msg)}")
                 else:
-                    # Handle non-list values (like single strings or other objects)
                     result['errors'].append(str(value))
         else:
+            result['detail'] = str(response.data)
             result['errors'].append(str(response.data))
 
     else:

@@ -75,7 +75,11 @@ This document keeps track of all completed components, database schemas, backgro
 * **[Added]** Notifications endpoints (`GET /api/notifications`, `POST /api/notifications/read`):
   * List and batch-mark-read with `all` or `ids` support.
 * **[Added]** Device registration (`POST /api/devices`):
-  * FCM push token registration stub.
+  * FCM push token registration with `Device` model persistence.
+* **[Fixed]** Error response format — exception handler now includes `detail` field for frontend compatibility.
+* **[Fixed]** Dashboard `today_date()` returning `date` class instead of `date.today()`.
+* **[Fixed]** Stop timestamps using `timezone.now()` instead of `date.today()`.
+* **[Added]** `Device` model in `accounts` for FCM token storage.
 
 ### 📝 Documentation
 * **[Added]** Full API endpoint reference to `README.md` with method, path, and auth requirements.

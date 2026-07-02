@@ -192,3 +192,23 @@ class Notification(Base):
 
     def __str__(self):
         return f"{self.title} -> {self.recipient}"
+
+
+class Device(Base):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="devices",
+    )
+    fcm_token = models.CharField(max_length=500)
+    platform = models.CharField(max_length=20, default="web")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "fcm_token"], name="unique_user_device"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user.phone} — {self.platform}"

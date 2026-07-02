@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from accounts.models import CustomUser, Parent, Driver, Notification
+from accounts.models import CustomUser, Parent, Driver, Notification, Device
 from children.models import Child, School, Schedule
 from trips.models import Trip, Stop, Assignment
 
@@ -478,4 +478,10 @@ class DeviceRegisterView(APIView):
         serializer = DeviceSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        data = serializer.validated_data
+        Device.objects.update_or_create(
+            user=request.user,
+            fcm_token=data['fcm_token'],
+            defaults={'platform': data.get('platform', 'web')},
+        )
         return Response(None, status=status.HTTP_204_NO_CONTENT)
