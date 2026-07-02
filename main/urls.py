@@ -26,12 +26,11 @@ from . import views, health
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="Django-Rest API",
+        title="SchoolRun API",
         default_version='v1',
-        description="Test description",
-        terms_of_service="https://www.google.com/policies/terms/",
-        contact=openapi.Contact(email="contact@snippets.local"),
-        license=openapi.License(name="BSD License"),
+        description="SchoolRun Backend API — school transport management platform.",
+        contact=openapi.Contact(email="dev@schoolrun.ng"),
+        license=openapi.License(name="Proprietary"),
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),

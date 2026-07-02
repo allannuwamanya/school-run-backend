@@ -1,117 +1,154 @@
-# Django REST Framework API Starter
+# SchoolRun — Backend API & Geo-Logistics Service
 
-This is a powerful and secure starter project for building RESTful APIs with Django. It comes pre-configured with a modern technology stack and essential features to get you up and running quickly.
+SchoolRun is a robust, developer-friendly backend for managing school commute logistics, driver routing, and event-stamped trip manifests. It provides a secure, role-scoped REST API for the React PWA frontend (used by parents and drivers) and a comprehensive admin console for operational staff.
 
+Rather than running heavy realtime WebSockets or WebSockets-over-Redis, SchoolRun captures **one-shot GPS event stamps** at the precise moments drivers check in. This allows parents to follow along via a clear status timeline showing timestamps and distance from the target pin.
 
-## Features
+---
 
-* **Modern Authentication**: Uses **JSON Web Tokens (JWT)** for secure, stateless authentication (`djangorestframework-simplejwt`).
-* **Custom User Model**: A flexible and extensible custom user model is ready from the start, using email as the primary identifier.
-* **API Documentation**: Automatic, interactive API documentation powered by **Swagger (drf-yasg)**.
-* **Environment-based Configuration**: All sensitive keys and settings are loaded from a `.env` file for better security.
-* **Custom Management Commands**: Includes a command to create a superuser from environment variables, perfect for deployment.
-* **Social Authentication Hooks**: Includes skeletons for Google and Facebook social authentication.
-* **CORS Ready**: Pre-configured with `django-cors-headers` to allow frontend integrations.
+## 🏛 Architecture
 
-## Getting Started
+```mermaid
+graph TD
+    subgraph Client Tier
+        PWA[React PWA - Parents & Drivers]
+        AdminPanel[Django Admin Console]
+    end
 
-Follow these instructions to get the project set up and running on your local machine.
+    subgraph Service Tier
+        DRF[DRF REST API - JWT Auth]
+        RouteEngine[Route Engine - Haversine & nearest-neighbour]
+        CeleryJobs[Celery Workers - Nightly manifest generator]
+    end
+
+    subgraph Infrastructure
+        DB[(PostgreSQL + PostGIS)]
+        RedisBroker[(Redis - Celery Broker)]
+    end
+
+    subgraph External Integrations
+        EgoSMS[EgoSMS - SMS notifications]
+        FCM[FCM - Web Push notifications]
+        Flw[Flutterwave - Subscriptions]
+    end
+
+    PWA -->|REST / JWT| DRF
+    AdminPanel -->|Django ORM| DRF
+    DRF --> RouteEngine
+    CeleryJobs --> RouteEngine
+    RouteEngine --> DB
+    CeleryJobs -.->|Task Queue| RedisBroker
+    DRF -.->|Push Notifications| FCM
+    DRF -.->|SMS alerts| EgoSMS
+    DRF -.->|Payment processing| Flw
+```
+
+---
+
+## 🚀 Key Features
+
+* **Phone-First Authentication**: Password-based login using phone numbers (no usernames/emails required) with role-scoped permissions (Parent, Driver, Admin).
+* **Nightly Trip & Stop Dispatcher**: A background Celery job runs nightly to build manifests using a **greedy nearest-neighbor spatial algorithm** that computes optimal pickup paths.
+* **One-Shot GPS Verification**: When drivers tap "Picked up" or "Arrived", their browser's location coordinates are validated server-side against target school boundaries and home coordinates (`ST_DWithin` / Python Haversine fallback) to auto-mark `gps_verified`.
+* **Zero-Config Local Fallback**: Dynamic fallback utilities mock PostGIS (`PointField`, `Point`) and Postgres (`ArrayField`) components using SQLite strings and standard JSON fields if system-level GIS libraries (`GDAL`) are missing. Runs locally out of the box!
+* **Transactional Email & Push Notifications**: Integrates with external SMS (EgoSMS) and Web Push (FCM) providers to update parents on manifest status events.
+
+---
+
+## 📂 Domain Structure
+
+The application codebase is modularized into focused Django sub-apps:
+
+* **`accounts`**: Custom user identity, phone credentials, parent profiles, driver onboarding profiles, and verification documents.
+* **`children`**: Registration of children, school geofences, and child-specific transport schedules.
+* **`trips`**: Driver-to-parent assignments, daily active trips, stop sequences, and live location caches.
+* **`payments`**: Subscription plans (Standard, Premium, Family+), transactions, Flutterwave payment gateways, and wallet balances.
+* **`incidents`**: Safety incident logs, emergency panic alerts, and direct operational messaging threads.
+* **`zones`**: Geographic zoning boundaries for grouping assignments and routes.
+
+---
+
+## ⚙️ Backend Setup
 
 ### Prerequisites
+* Python 3.10+
+* Redis (running for Celery queue)
+* PostGIS (optional, required for production geography checks)
 
-* Python 3.8+
-* `virtualenv` (or another virtual environment tool)
+### Local Environment Setup (Zero-Config Fallback)
+If system-level libraries like `GDAL` or `libproj` are missing, the project will automatically start in **SQLite fallback mode**.
 
-### Installation and Setup
+1. **Clone and Create Virtual Environment**:
+   ```bash
+   git clone <repo-url>
+   cd school-run-be
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
 
-1.  **Clone the Project**
-    ```bash
-    git clone [https://github.com/morshedmasud/django-rest-framework-mysql-boilerplate.git](https://github.com/morshedmasud/django-rest-framework-mysql-boilerplate.git)
-    cd django-rest-framework-mysql-boilerplate
-    ```
+2. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-2.  **Create and Activate a Virtual Environment**
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate
-    ```
-    *On Windows, use `venv\Scripts\activate`*
+3. **Configure Environment (`.env`)**:
+   Create a `.env` file from the template:
+   ```bash
+   cp .env.example .env
+   ```
+   Add a generated `SECRET_KEY` and set `DB_CHOICE=sqlite`.
 
-3.  **Install Dependencies**
-    ```bash
-    pip install -r requirements.txt
-    ```
+4. **Run Migrations & Create Superuser**:
+   ```bash
+   python manage.py makemigrations
+   python manage.py migrate
+   python manage.py create_super_user
+   ```
+   *Note: Creating a superuser will prompt for a **phone number** (primary identity) instead of username.*
 
-4.  **Set Up Environment Variables**
+5. **Start Development Server**:
+   ```bash
+   python manage.py runserver
+   ```
 
-    Create a `.env` file in the project root by copying the example file:
-    ```bash
-    cp .env.example .env
-    ```
+---
 
-    Now, open the `.env` file and fill in the required values. At a minimum, you need to generate a `SECRET_KEY`.
+## ⏰ Background Jobs (Celery & Redis)
 
-    **Generate a Secret Key:**
-    You can generate a new secret key using the built-in Django utility:
-    ```bash
-    python generate_key.py
-    ```
-    Copy the output and paste it as the value for `SECRET_KEY` in your `.env` file.
+Trips and stop sequences are generated every night for the next day.
 
-    **Your `.env` file should look like this:**
-    ```env
-    # SECURITY
-    SECRET_KEY=your_newly_generated_secret_key_here
-    DEBUG=1
-    ALLOWED_HOSTS=127.0.0.1,localhost
+### Run Celery Worker:
+```bash
+celery -A main worker -l info
+```
 
-    # ADMIN USER CREDENTIALS
-    ADMIN_EMAIL=admin@example.com
-    ADMIN_PASSWORD=YourSecurePassword123
+### Run Celery Beat Scheduler:
+```bash
+celery -A main beat -l info
+```
 
-    # DATABASE (Defaults to SQLite)
-    # DB_NAME=your_db
-    # DB_USER=your_user
-    # ...
-    ```
+### Running Nightly Job Manually (Management Command):
+You can manually run or test the manifest generation command:
+```bash
+python manage.py shell -c "from trips.tasks import generate_daily_manifests; generate_daily_manifests.delay()"
+```
 
-5.  **Run Database Migrations**
-    This will create the necessary database tables, including those for the custom user model.
-    ```bash
-    python manage.py migrate
-    ```
+---
 
-6.  **Create a Superuser**
-    This command will create an admin account using the credentials you set in your `.env` file.
-    ```bash
-    python manage.py create_super_user
-    ```
+## 🗺 Production Deployments (Postgres + PostGIS)
 
-7.  **Run the Development Server**
-    ```bash
-    python manage.py runserver
-    ```
-    The API will now be running at `http://127.0.0.1:8000/`.
+For production environments, PostGIS must be installed and active.
 
-## API Endpoints
+1. **System Libraries**:
+   ```bash
+   sudo apt install binutils libproj-dev gdal-bin libgdal-dev
+   ```
 
-Once the server is running, you can interact with the following key endpoints:
+2. **PostgreSQL Setup**:
+   Log in to PostgreSQL as superuser and enable PostGIS:
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS postgis;
+   ```
 
-* **Admin Panel**: `http://127.0.0.1:8000/admin/`
-* **API Documentation (Swagger)**: `http://127.0.0.1:8000/swagger/`
-
-### Authentication Endpoints
-
-* **Register a new user**:
-    * `POST /api/register/`
-    * Body: `{ "full_name": "John Doe", "email": "john.doe@example.com", "password": "yourpassword" }`
-* **Obtain JWT Tokens**:
-    * `POST /api/login/`
-    * Body: `{ "email": "your_email", "password": "your_password" }`
-    * **Returns**: An `access` and `refresh` token.
-* **Refresh Access Token**:
-    * `POST /api/login/refresh/`
-    * Body: `{ "refresh": "your_refresh_token" }`
-
-To access protected endpoints, include the access token in the request header:
-`Authorization: Bearer <your_access_token>`
+3. **Update `.env`**:
+   Set `DB_CHOICE=postgres` and provide your `DATABASE_URL` (e.g. `postgis://user:pass@host:port/dbname`).

@@ -1,192 +1,183 @@
-# API Sample Data
+# SchoolRun API — Sample Payloads
 
-Here are sample JSON payloads for testing the API endpoints.
+Here are sample JSON payloads for testing the SchoolRun database and backend API endpoints.
 
-## 1. Create Investment Profile
+---
 
-**Endpoint:** `POST /profiles/investment-profiles/`
+## 1. Register a User (Parent or Driver)
 
-```json
-{
-  "user": 1,
-  "bio": "Experienced angel investor focused on agri-tech.",
-  "philosophy": "Investing in sustainable future.",
-  "check_size_range": "5000-10000",
-  "investment_type": "technology",
-  "linkedin": "https://linkedin.com/in/investor",
-  "twitter": "https://twitter.com/investor"
-}
-```
-
-## 2. Create Business
-
-**Endpoint:** `POST /profiles/businesses/`
+**Endpoint:** `POST /user/register`
 
 ```json
 {
-  "user": 1,
-  "name": "Green Future Agro",
-  "category": "agriculture",
-  "description": "Sustainable farming solutions for modern Africa.",
-  "address": "123 Farm Road",
-  "city": "Kampala",
-  "country": "Uganda",
-  "phone": "+256700000000",
-  "email": "contact@greenfuture.com",
-  "website": "https://greenfuture.com",
-  "is_verified": false
+  "email": "amara.johnson@example.com",
+  "full_name": "Amara Johnson",
+  "phone": "+2348012345678",
+  "password": "SecurePassword123!",
+  "role": "parent"
 }
 ```
 
-## 3. Create Business Milestone
+---
 
-**Endpoint:** `POST /profiles/milestones/`
+## 2. Parent Profile Setup & Preferences
+
+**Endpoint:** `PATCH /user/me/` (or update user details)
 
 ```json
 {
-  "business": 1,
-  "title": "Reached 1000 Farmers",
-  "description": "Onboarded 1000 farmers to our platform.",
-  "date": "2025-10-15"
+  "nin_verified": true,
+  "push_notifications_enabled": true,
+  "location_sharing_enabled": true,
+  "dark_mode": false
 }
 ```
 
-## 4. Create Investment Request
+---
 
-**Endpoint:** `POST /profiles/investment-requests/`
+## 3. Create a Child Profile
+
+**Endpoint:** `POST /api/children/`
 
 ```json
 {
-  "user": 1,
-  "business": 1,
-  "name": "Seed Round Expansion",
-  "type": "equity",
-  "amount": "50000000.00",
-  "currency": "UGX",
-  "description": "Seeking funds to expand to Northern region.",
-  "date": "2026-01-01",
-  "status": "pending",
-  "return_on_investment": "15.00"
+  "full_name": "Maya Johnson",
+  "age": 8,
+  "gender": "female",
+  "blood_type": "O+",
+  "class_grade": "Grade 3",
+  "school_name": "Greenfield Academy, Lagos",
+  "allergy_notes": "Peanut Allergy",
+  "pickup_instructions": "Gate Code: 1234. Ring bell."
 }
 ```
 
-## 5. Record Investment
+---
 
-**Endpoint:** `POST /profiles/investments/`
+## 4. Setup Child Schedule
+
+**Endpoint:** `POST /api/children/{child_uuid}/schedule/`
 
 ```json
 {
-  "investor": 2,
-  "request": 1,
-  "amount": "10000000.00",
-  "description": "Initial tranche.",
-  "date": "2026-02-01",
-  "status": "approved"
+  "apply_to_all_children": true,
+  "morning_dropoff_time": "07:00:00",
+  "afternoon_pickup_time": "16:00:00",
+  "monday": true,
+  "tuesday": true,
+  "wednesday": true,
+  "thursday": true,
+  "friday": true,
+  "saturday": false,
+  "sunday": false
 }
 ```
 
-## 6. Create Community
+---
 
-**Endpoint:** `POST /profiles/communities/`
+## 5. Add Child Pickup Location
+
+**Endpoint:** `POST /api/children/{child_uuid}/pickup-locations/`
 
 ```json
 {
-  "name": "Agri-Tech Innovators",
-  "description": "A community for tech-enabled agriculture.",
-  "people": [1, 2],
-  "businesses": [1]
+  "address": "14 Adeola Close, Lekki Phase 1, Lagos",
+  "latitude": 6.4281,
+  "longitude": 3.4219,
+  "is_primary": true
 }
 ```
 
-## 7. Create Job Posting
+---
 
-**Endpoint:** `POST /profiles/job-postings/`
+## 6. Driver Onboarding Progress & Vehicle Setup
+
+**Endpoint:** `POST /api/drivers/onboarding/vehicle/`
 
 ```json
 {
-  "business": 1,
-  "title": "Senior Agronomist",
-  "description": "Looking for an experienced agronomist to lead our field team.",
-  "location": "Gulu",
-  "type": "full_time",
-  "salary_range": "2M - 3M UGX",
-  "deadline": "2026-03-30",
-  "is_active": true
+  "model": "Toyota Hiace (Silver)",
+  "color": "Silver",
+  "plate": "LSD 342 QX",
+  "capacity": 9
 }
 ```
 
-## 8. Create Job Application
+---
 
-**Endpoint:** `POST /profiles/job-applications/`
+## 7. Driver Document Status Check / Review (Admin Panel API)
+
+**Endpoint:** `PATCH /api/drivers/documents/{doc_id}/`
 
 ```json
 {
-  "job": 1,
-  "applicant": 3,
-  "cover_letter": "I am very interested in this position...",
-  "status": "pending"
-  // Resume file would be handled via multipart/form-data usually
+  "status": "verified",
+  "notes": "Driver license looks clear and valid until 2029."
 }
 ```
 
-## 9. Create User (via Accounts App)
+---
 
-**Endpoint:** `POST /user/register` _(Note: Endpoint may vary based on `accounts` app implementation)_
+## 8. Dispatch/Trip Log Creation
+
+**Endpoint:** `POST /api/trips/`
 
 ```json
 {
-  "email": "newuser@example.com",
-  "full_name": "New User",
-  "password": "securepassword123"
+  "route_id": "RT-001",
+  "trip_type": "standard",
+  "date": "2026-07-02",
+  "distance_km": 15.6,
+  "price": 2500.00,
+  "status": "scheduled"
 }
 ```
 
-## 10. Add People to Community
+---
 
-**Endpoint:** `POST /profiles/communities/{id}/add-people/`
+## 9. Stop Status Update (Driver App)
+
+**Endpoint:** `PATCH /api/stops/{stop_id}/`
 
 ```json
 {
-  "user_ids": [1, 3, 5]
+  "status": "picked_up",
+  "actual_arrival": "2026-07-02T07:15:00Z"
 }
 ```
 
-## 11. Add Businesses to Community
+---
 
-**Endpoint:** `POST /profiles/communities/{id}/add-businesses/`
+## 10. Trigger a Critical Incident (Panic Alert)
 
-````json
-{
-  "business_ids": [2, 4]
-}
-
-## 12. Get Current User Profile (with related data)
-**Endpoint:** `GET /user/me`
-**Header:** `Authorization: Token <your_token>`
+**Endpoint:** `POST /api/incidents/`
 
 ```json
 {
-  "id": 1,
-  "full_name": "John Doe",
-  "email": "john@example.com",
-  "phone": "+256700000000",
-  "photo": null,
-  "address": "Kampala",
-  "created_at": "2026-02-19T10:00:00Z",
-  "businesses": [
-    {
-      "id": 1,
-      "name": "Green Future Agro",
-      "category": "agriculture",
-      ...
-    }
-  ],
-  "investment_profiles": [],
-  "job_applications": [],
-  "communities": []
+  "incident_type": "panic_alert",
+  "severity": "critical",
+  "trip": 42,
+  "child": 12,
+  "latitude": 6.4312,
+  "longitude": 3.4278,
+  "police_involved": true,
+  "resolution_notes": "Panic button pressed by parent. Driver verified false alarm, child was safely inside school gates."
 }
-````
-
 ```
 
+---
+
+## 11. Subscription Plan Billing & Transactions
+
+**Endpoint:** `POST /api/payments/transactions/`
+
+```json
+{
+  "transaction_id": "TXN-984372981-L",
+  "payment_type": "monthly_sub",
+  "amount": 25000.00,
+  "payment_method": "card",
+  "status": "paid",
+  "reference": "pstk_pay_8493028471"
+}
 ```

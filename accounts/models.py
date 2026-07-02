@@ -1,122 +1,90 @@
+import uuid
+from django.conf import settings
+from django.contrib.auth.base_user import BaseUserManager, AbstractBaseUser
+from django.contrib.auth.models import PermissionsMixin
 from django.db import models
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager,PermissionsMixin
-from django.utils.translation import gettext_lazy as _
-from django.db.models import Q
 from rest_framework_simplejwt.tokens import RefreshToken
-from uuid import uuid4
 
+# ---------------------------------------------------------------------------
+# Shared base
+# ---------------------------------------------------------------------------
+class Base(models.Model):
+    """UUID pk + timestamps for every domain model."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        abstract = True
+
+BaseModel = Base
+
+
+# ---------------------------------------------------------------------------
+# Auth: phone-first custom user
+# ---------------------------------------------------------------------------
 class UserManager(BaseUserManager):
+    use_in_migrations = True
 
-    def create_user(self, email, full_name, password=None):
-        if not email:
-            raise ValueError('User must have email')
-
-        email = email.lower()
-        full_name = full_name.title()
-
-        user = self.model(
-            email=self.normalize_email(email),
-            full_name=full_name,
-        )
-
+    def create_user(self, phone, password=None, **extra):
+        if not phone:
+            raise ValueError("A phone number is required.")
+        user = self.model(phone=phone, **extra)
         user.set_password(password)
         user.save(using=self._db)
-
         return user
 
-    def create_user_social(self, email=None, full_name=None, provider=None, social_id=None):
-        if not provider and social_id:
-            raise ValueError('Provider and social id is missing')
-
-        email = email.lower()
-        full_name = full_name.title()
-
-        user = self.model(
-            email=self.normalize_email(email),
-            full_name=full_name,
-            auth_provider=provider,
-            auth_id=social_id
-        )
-        user.is_verified = True
-
-        user.save(using=self._db)
-        return user
-
-    def create_superuser(self, email, full_name=None, password=None):
-        user = self.create_user(
-            email=email,
-            full_name=full_name if full_name else email,
-            password=password
-        )
-
-        user.is_admin = True
-        user.is_staff = True
-        user.save(using=self._db)
-
-        return user
+    def create_superuser(self, phone, password=None, **extra):
+        extra.setdefault("is_staff", True)
+        extra.setdefault("is_superuser", True)
+        extra.setdefault("role", CustomUser.Role.ADMIN)
+        if extra.get("is_staff") is not True:
+            raise ValueError("Superuser must have is_staff=True.")
+        if extra.get("is_superuser") is not True:
+            raise ValueError("Superuser must have is_superuser=True.")
+        return self.create_user(phone, password, **extra)
 
 
-AUTH_PROVIDERS = {'facebook': 'facebook', 'google': 'google', 'twitter': 'twitter', 'email': 'email'}
+class CustomUser(AbstractBaseUser, PermissionsMixin):
+    """
+    Login is by phone, not username/email.
+    Parents self-register (role=PARENT). Admin creates drivers (role=DRIVER).
+    Ops staff are role=ADMIN and use Django admin (is_staff=True).
+    """
+    class Role(models.TextChoices):
+        PARENT = "PARENT", "Parent"
+        DRIVER = "DRIVER", "Driver"
+        ADMIN = "ADMIN", "Admin"
 
+    username = None
+    first_name = None
+    last_name = None
 
-class CustomUser(AbstractBaseUser,PermissionsMixin):
-
-    ACTIVE = 'active'
-    INACTIVE = 'inactive'
-    DELETED = 'deleted'
-    STATUS = [
-        (ACTIVE, _('Active user')),
-        (INACTIVE, _('User Inactive')),
-        (DELETED, _('Soft Delete user')),
-    ]
-
-    email = models.EmailField(max_length=200, unique=True, null=True, blank=True, verbose_name='email')
-    full_name = models.CharField(max_length=150, null=True, blank=True, verbose_name='Full Name')
-    phone = models.CharField(max_length=50, unique=True, null=True, blank=True)
-    photo = models.ImageField(upload_to='user_images/', null=True, blank=True)
-    address = models.TextField(null=True, blank=True)
-    verify_code = models.TextField(null=True, blank=True)
-    is_verified = models.BooleanField(default=False)
-    updated_at = models.DateTimeField(auto_now_add=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=True)
-    is_superuser = models.BooleanField(default=False)
-    is_admin = models.BooleanField(default=False)
+    phone = models.CharField(max_length=20, unique=True)
+    email = models.EmailField(max_length=200, null=True, blank=True)
+    full_name = models.CharField(max_length=120, blank=True)
+    role = models.CharField(max_length=10, choices=Role.choices, default=Role.PARENT)
+    
     is_staff = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
 
-    auth_id = models.TextField(null=True, blank=True)
-    auth_provider = models.CharField(max_length=255, blank=False, null=False, default=AUTH_PROVIDERS.get('email'))
-    deleted = models.BooleanField(default=False)
+    # preferences & verification from contract
+    nin_verified = models.BooleanField(default=False)
+    push_notifications_enabled = models.BooleanField(default=True)
+    location_sharing_enabled = models.BooleanField(default=True)
+    dark_mode = models.BooleanField(default=False)
 
-    status = models.CharField(max_length=32, choices=STATUS, default=ACTIVE)
-
-    USERNAME_FIELD = 'email'
+    USERNAME_FIELD = "phone"
     REQUIRED_FIELDS = []
 
     objects = UserManager()
-
     all_objects = models.Manager()
-    def __str__(self):
-        return self.email
-
-    def get_short_name(self):
-        return self.full_name
-
-    def has_perm(self, perm, obj=None):
-        return self.is_admin
-
-    def has_module_perms(self, app_label):
-        return self.is_admin
 
     class Meta:
-        verbose_name_plural = 'users'
+        verbose_name_plural = "users"
 
-    def get_user_info(self):
-        return {
-            'user_id': self.id,
-            'email': self.email,
-            'full_name': self.full_name
-        }
+    def __str__(self):
+        return self.full_name or self.phone
 
     def tokens(self):
         refresh = RefreshToken.for_user(self)
@@ -126,28 +94,68 @@ class CustomUser(AbstractBaseUser,PermissionsMixin):
         }
 
 
-# Contains extra fields for the user separate from auth (auth provider will tell us how they signed up)
-class ModelManager(models.Manager):
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        return queryset.exclude(Q(active=False) | Q(deleted=True))
+# ---------------------------------------------------------------------------
+# Parents & Drivers profiles inside accounts to match schema structure
+# ---------------------------------------------------------------------------
+class Parent(Base):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="parent"
+    )
+    emergency_contact = models.CharField(max_length=20, blank=True)
+    is_verified = models.BooleanField(default=False)
 
-class BaseModel(models.Model):
-    objects = ModelManager()
-    all_objects = models.Manager()
-    uuid = models.UUIDField(default=uuid4,max_length=250,)
-    created_at = models.DateTimeField(auto_created=True, null=True, auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True, null=True)
-    deleted = models.BooleanField(default=False)
-    active = models.BooleanField(default=True)
+    def __str__(self):
+        return self.user.full_name or self.user.phone
 
-    def delete(self, using=None, keep_parents=False):
-        self.deleted = True
-        self.active = False
-        self.save()
+
+class Driver(Base):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="driver"
+    )
+    vehicle_make = models.CharField(max_length=60, blank=True)
+    vehicle_model = models.CharField(max_length=60, blank=True)
+    plate = models.CharField(max_length=20, unique=True)
+    color = models.CharField(max_length=30, blank=True)
+    seats = models.PositiveSmallIntegerField(default=14)
+    rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    is_verified = models.BooleanField(default=False)
+    driver_since = models.DateField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user.full_name or self.user.phone} ({self.plate})"
+
+
+class VerificationDocument(Base):
+    class DocType(models.TextChoices):
+        LICENSE = "LICENSE", "Driver's licence"
+        INSPECTION = "INSPECTION", "Vehicle inspection report"
+        BACKGROUND = "BACKGROUND", "Criminal background check"
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        VERIFIED = "VERIFIED", "Verified"
+        CLEAR = "CLEAR", "Clear"
+        REJECTED = "REJECTED", "Rejected"
+
+    driver = models.ForeignKey(
+        Driver, on_delete=models.CASCADE, related_name="documents"
+    )
+    doc_type = models.CharField(max_length=12, choices=DocType.choices)
+    status = models.CharField(
+        max_length=8, choices=Status.choices, default=Status.PENDING
+    )
+    file = models.FileField(upload_to="driver_docs/", null=True, blank=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        abstract = True
+        constraints = [
+            models.UniqueConstraint(
+                fields=["driver", "doc_type"], name="one_doc_per_type_per_driver"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.get_doc_type_display()} — {self.driver}"
 
 
 class ErrorLog(models.Model):
@@ -158,3 +166,29 @@ class ErrorLog(models.Model):
 
     def __str__(self):
         return f"[{self.level}] {self.timestamp}: {self.message[:50]}"
+
+
+class Notification(Base):
+    class Kind(models.TextChoices):
+        PICKUP = "PICKUP", "Picked up"
+        ARRIVAL = "ARRIVAL", "Arrived at school"
+        DROPOFF = "DROPOFF", "Dropped at home"
+        DRIVER_NEARBY = "DRIVER_NEARBY", "Driver nearby"
+        SYSTEM = "SYSTEM", "System"
+
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+    kind = models.CharField(max_length=13, choices=Kind.choices)
+    title = models.CharField(max_length=160)
+    body = models.TextField(blank=True)
+    is_read = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["recipient", "is_read"])]
+
+    def __str__(self):
+        return f"{self.title} -> {self.recipient}"
