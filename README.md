@@ -135,6 +135,75 @@ python manage.py shell -c "from trips.tasks import generate_daily_manifests; gen
 
 ---
 
+## 🔌 API Endpoints (Phase 1 — Frontend Contract)
+
+All endpoints are under `/api/` and return plain JSON. Auth uses **JWT** (`Authorization: Bearer <access>`).  
+The full contract spec is in [`API_CONTRACT.md`](https://github.com/Odd-Shoes-Dev/school-run-fe/blob/main/API_CONTRACT.md) (frontend repo).
+
+### Auth (public)
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/auth/register` | Register a parent (`phone`, `password`, `full_name`) |
+| POST | `/api/auth/login` | Login with `phone` + `password` |
+| POST | `/api/auth/refresh` | Refresh JWT access token |
+
+### Account (any authenticated)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET/PATCH | `/api/me` | Get/update profile and preferences |
+
+### Schools (any authenticated)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/schools?q=` | Search schools by name |
+
+### Children & Schedule (parent only)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET/POST | `/api/children` | List or create a child |
+| GET/PATCH/DELETE | `/api/children/{id}` | Retrieve, update, or soft-delete a child |
+| PUT | `/api/children/{id}/schedule` | Set child's weekly schedule |
+
+### Dashboard (parent only)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/dashboard` | Today's trip status per child |
+| GET | `/api/parent/driver` | Assigned driver & verification status |
+
+### Driver (driver only)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/driver/manifest?date=` | Today's manifest with ordered stops |
+| POST | `/api/driver/trips/{id}/start` | Mark trip in progress |
+| POST | `/api/driver/trips/{id}/complete` | Mark trip completed |
+
+### Stops (driver only — one-shot GPS)
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/stops/{id}/pickup` | Mark child picked up (with GPS) |
+| POST | `/api/stops/{id}/dropoff` | Mark child dropped off (with GPS) |
+| POST | `/api/stops/{id}/no-show` | Mark child as no-show |
+
+### History (parent only)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/history?type=` | Paginated ride history |
+
+### Notifications & Devices (any authenticated)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/notifications?unread=` | List notifications |
+| POST | `/api/notifications/read` | Mark notifications as read |
+| POST | `/api/devices` | Register FCM push token |
+
+### Response formats
+- **Success**: plain JSON matching the contract shapes
+- **List endpoints**: `{ "count": N, "next": url|null, "previous": url|null, "results": [...] }`
+- **Errors**: `{ "detail": "message" }` or `{ "field": ["message"] }`
+- **Geo**: Always `{ "lat": float, "lng": float }`
+
+---
+
 ## 🗺 Production Deployments (Postgres + PostGIS)
 
 For production environments, PostGIS must be installed and active.
