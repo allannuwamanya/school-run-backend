@@ -1,3 +1,5 @@
+from datetime import date as date_today
+
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from accounts.models import CustomUser, Parent, Driver, VerificationDocument, Notification
@@ -416,6 +418,5 @@ class DeviceSerializer(serializers.Serializer):
     platform = serializers.CharField()
 
 
-from datetime import date as date_today
 def today_date():
     return date_today()

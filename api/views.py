@@ -1,7 +1,7 @@
-from datetime import date
 from math import radians, sin, cos, sqrt, asin
 
 from django.db import transaction
+from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -347,11 +347,11 @@ def process_stop_event(request, stop_id, kind):
                 gps_verified = None
         if kind == 'pickup':
             stop.status = Stop.Status.PICKED_UP
-            stop.picked_at = date.today()
+            stop.picked_at = timezone.now()
             stop.picked_point = point
         else:
             stop.status = Stop.Status.DROPPED
-            stop.dropped_at = date.today()
+            stop.dropped_at = timezone.now()
             stop.dropped_point = point
         if trip.status == Trip.Status.SCHEDULED:
             trip.status = Trip.Status.IN_PROGRESS
