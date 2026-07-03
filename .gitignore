@@ -667,6 +667,7 @@ MigrationBackup/
 static/*
 user_images/*
 
-# Ignore migrations but keep __init__.py
-**/migrations/*
-!**/migrations/__init__.py
+# Ignore default per-app migrations but keep __init__.py
+# (custom migration modules in migrations/<app>/ are NOT ignored)
+*/migrations/*
+!*/migrations/__init__.py
