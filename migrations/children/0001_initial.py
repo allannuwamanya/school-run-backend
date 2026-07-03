@@ -57,7 +57,7 @@ class Migration(migrations.Migration):
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('morning_time', models.TimeField()),
                 ('afternoon_time', models.TimeField()),
-                ('days', main.gis_fallback.ArrayField(default=list)),
+                ('days', main.gis_fallback.ArrayField(models.PositiveSmallIntegerField(), default=list)),
                 ('child', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='schedule', to='children.child')),
             ],
             options={
