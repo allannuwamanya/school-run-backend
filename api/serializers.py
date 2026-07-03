@@ -341,7 +341,7 @@ class StopNoShowSerializer(serializers.Serializer):
 
 class StopEventResultSerializer(serializers.Serializer):
     id = serializers.SerializerMethodField()
-    status = serializers.CharField()
+    status = serializers.SerializerMethodField()
     picked_at = serializers.SerializerMethodField()
     dropped_at = serializers.SerializerMethodField()
     picked_point = serializers.SerializerMethodField()
@@ -352,6 +352,9 @@ class StopEventResultSerializer(serializers.Serializer):
 
     def get_id(self, obj):
         return str(obj['stop'].id)
+
+    def get_status(self, obj):
+        return obj['stop'].status
 
     def get_picked_at(self, obj):
         return obj['stop'].picked_at.isoformat() if obj['stop'].picked_at else None
