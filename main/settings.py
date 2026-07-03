@@ -9,6 +9,16 @@ from pathlib import Path
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# GDAL/GEOS library paths (Windows local dev). Must be set before
+# `main.gis_fallback` (or anything importing django.contrib.gis) runs, since
+# that's when Django's ctypes loader reads these settings. Unset on
+# Linux/production — Django falls back to standard .so auto-discovery there.
+GDAL_LIBRARY_PATH = os.environ.get('GDAL_LIBRARY_PATH') or None
+GEOS_LIBRARY_PATH = os.environ.get('GEOS_LIBRARY_PATH') or None
+# GDAL_DATA / PROJ_LIB are read directly from os.environ by the GDAL/PROJ C
+# libraries themselves (not via Django settings) — already populated by
+# manage.py's load_dotenv() call before this module executes.
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 

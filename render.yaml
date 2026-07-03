@@ -18,9 +18,10 @@ services:
       - key: DB_CHOICE
         value: postgres
       - key: DATABASE_URL
-        fromDatabase:
-          name: schoolrun-db
-          property: connectionString
+        # Neon Postgres connection string (direct/non-pooled endpoint — see
+        # the note in .env.example). Paste it into this env var in the
+        # Render dashboard after the first deploy; never commit it here.
+        sync: false
       - key: CELERY_BROKER_URL
         fromService:
           type: redis
@@ -44,9 +45,6 @@ services:
     maxmemoryPolicy: noeviction
     ipAllowList: []
 
-databases:
-  - name: schoolrun-db
-    plan: free
-    region: oregon
-    postgresMajorVersion: 16
-    ipAllowList: []
+# Database: Neon (external, not Render-managed) — see the DATABASE_URL
+# env var above. The Render-managed Postgres addon this project used to
+# provision here has been removed in favor of Neon.
