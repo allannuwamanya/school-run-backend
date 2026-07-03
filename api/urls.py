@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from . import views
+from . import admin_views, views
 
 urlpatterns = [
     # Existing JWT endpoints
@@ -37,4 +37,33 @@ urlpatterns = [
     path('notifications/read', views.NotificationReadView.as_view(), name='api-notifications-read'),
     # Devices
     path('devices', views.DeviceRegisterView.as_view(), name='api-devices'),
+
+    # Admin console
+    path('admin/overview', admin_views.AdminOverviewView.as_view(), name='admin-overview'),
+    path('admin/drivers', admin_views.AdminDriverListView.as_view(), name='admin-drivers'),
+    path('admin/drivers/<uuid:pk>', admin_views.AdminDriverDetailView.as_view(), name='admin-driver-detail'),
+    path('admin/drivers/<uuid:pk>/approve', admin_views.AdminDriverApproveView.as_view(), name='admin-driver-approve'),
+    path('admin/drivers/<uuid:pk>/reject', admin_views.AdminDriverRejectView.as_view(), name='admin-driver-reject'),
+    path(
+        'admin/drivers/<uuid:pk>/request-docs',
+        admin_views.AdminDriverRequestDocsView.as_view(),
+        name='admin-driver-request-docs',
+    ),
+    path('admin/parents', admin_views.AdminParentListView.as_view(), name='admin-parents'),
+    path('admin/parents/<uuid:pk>/suspend', admin_views.AdminParentSuspendView.as_view(), name='admin-parent-suspend'),
+    path('admin/zones', admin_views.AdminZoneListView.as_view(), name='admin-zones'),
+    path('admin/dispatch', admin_views.AdminDispatchView.as_view(), name='admin-dispatch'),
+    path('admin/payments', admin_views.AdminPaymentsView.as_view(), name='admin-payments'),
+    path(
+        'admin/payments/<uuid:pk>/refund',
+        admin_views.AdminRefundTransactionView.as_view(),
+        name='admin-payments-refund',
+    ),
+    path('admin/incidents', admin_views.AdminIncidentListView.as_view(), name='admin-incidents'),
+    path(
+        'admin/incidents/<str:incident_id>/resolve',
+        admin_views.AdminIncidentResolveView.as_view(),
+        name='admin-incidents-resolve',
+    ),
+    path('admin/analytics', admin_views.AdminAnalyticsView.as_view(), name='admin-analytics'),
 ]

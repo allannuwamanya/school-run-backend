@@ -103,6 +103,10 @@ class Parent(Base):
     )
     emergency_contact = models.CharField(max_length=20, blank=True)
     is_verified = models.BooleanField(default=False)
+    zone = models.ForeignKey(
+        "zones.Zone", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="parent_profiles",
+    )
 
     def __str__(self):
         return self.user.full_name or self.user.phone
@@ -120,6 +124,10 @@ class Driver(Base):
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
     is_verified = models.BooleanField(default=False)
     driver_since = models.DateField(null=True, blank=True)
+    zone = models.ForeignKey(
+        "zones.Zone", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="driver_profiles",
+    )
 
     def __str__(self):
         return f"{self.user.full_name or self.user.phone} ({self.plate})"
