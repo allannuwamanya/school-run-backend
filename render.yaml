@@ -12,7 +12,7 @@ services:
       - key: ALLOWED_HOSTS
         value: schoolrun-api.onrender.com
       - key: CORS_ALLOWED_ORIGINS
-        value: https://your-frontend-domain.com
+        value: https://school-run-fe.vercel.app
       - key: CSRF_TRUSTED_ORIGINS
         value: https://schoolrun-api.onrender.com
       - key: DB_CHOICE
