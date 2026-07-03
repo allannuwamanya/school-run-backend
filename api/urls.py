@@ -51,6 +51,16 @@ urlpatterns = [
     ),
     path('admin/parents', admin_views.AdminParentListView.as_view(), name='admin-parents'),
     path('admin/parents/<uuid:pk>/suspend', admin_views.AdminParentSuspendView.as_view(), name='admin-parent-suspend'),
+    path(
+        'admin/parents/<uuid:pk>/assign-driver',
+        admin_views.AdminParentAssignDriverView.as_view(),
+        name='admin-parent-assign-driver',
+    ),
+    path(
+        'admin/parents/<uuid:pk>/unassign-driver',
+        admin_views.AdminParentUnassignDriverView.as_view(),
+        name='admin-parent-unassign-driver',
+    ),
     path('admin/zones', admin_views.AdminZoneListView.as_view(), name='admin-zones'),
     path('admin/dispatch', admin_views.AdminDispatchView.as_view(), name='admin-dispatch'),
     path('admin/payments', admin_views.AdminPaymentsView.as_view(), name='admin-payments'),

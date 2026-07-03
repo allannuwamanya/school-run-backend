@@ -10,7 +10,7 @@ from accounts.models import CustomUser, Driver, Parent, VerificationDocument
 from children.models import Child
 from incidents.models import Incident, IncidentTimeline
 from payments.models import Subscription, Transaction
-from trips.models import Stop, Trip
+from trips.models import Assignment, Stop, Trip
 from zones.models import Zone
 
 from .admin_permissions import IsAdmin
@@ -278,6 +278,30 @@ class AdminParentSuspendView(APIView):
         parent = get_object_or_404(Parent.objects.select_related("user"), pk=pk)
         parent.user.is_active = not parent.user.is_active
         parent.user.save()
+        return ok(serialize_parent_row(parent))
+
+
+class AdminParentAssignDriverView(APIView):
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        parent = get_object_or_404(Parent, pk=pk)
+        driver_id = request.data.get("driver_id")
+        if not driver_id:
+            return err("driver_id is required.", 400)
+        driver = get_object_or_404(Driver, pk=driver_id)
+
+        Assignment.objects.filter(parent=parent, is_active=True).update(is_active=False)
+        Assignment.objects.create(parent=parent, driver=driver, is_active=True)
+        return ok(serialize_parent_row(parent))
+
+
+class AdminParentUnassignDriverView(APIView):
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        parent = get_object_or_404(Parent, pk=pk)
+        Assignment.objects.filter(parent=parent, is_active=True).update(is_active=False)
         return ok(serialize_parent_row(parent))
 
 
