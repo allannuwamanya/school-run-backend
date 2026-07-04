@@ -32,7 +32,7 @@ def send_push(user, title: str, body: str, data: dict | None = None):
     _init()
     if not _initialized:
         return
-    tokens = list(Device.objects.filter(user=user).values_list('token', flat=True))
+    tokens = list(Device.objects.filter(user=user).values_list('fcm_token', flat=True))
     if not tokens:
         return
     message = messaging.MulticastMessage(
