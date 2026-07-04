@@ -11,6 +11,7 @@ from children.models import Child
 from incidents.models import Incident, IncidentTimeline
 from payments.models import Subscription, Transaction
 from trips.models import Assignment, Stop, Trip
+from trips.tasks import sync_trip_for_schedule
 from zones.models import Zone
 
 from .admin_permissions import IsAdmin
@@ -293,6 +294,13 @@ class AdminParentAssignDriverView(APIView):
 
         Assignment.objects.filter(parent=parent, is_active=True).update(is_active=False)
         Assignment.objects.create(parent=parent, driver=driver, is_active=True)
+
+        # Reflect the new assignment on the driver's manifest immediately for
+        # any of the parent's children already scheduled for today, rather
+        # than waiting on the next schedule save.
+        for child in Child.objects.filter(parent=parent, is_active=True):
+            sync_trip_for_schedule(child)
+
         return ok(serialize_parent_row(parent))
 
 
