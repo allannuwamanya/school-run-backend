@@ -117,7 +117,10 @@ class MeView(APIView):
         if 'preferences' in data:
             prefs = data['preferences']
             if 'push' in prefs:
-                request.user.push_notifications_enabled = prefs['push']
+                if request.user.role == CustomUser.Role.DRIVER:
+                    request.user.push_notifications_enabled = True
+                else:
+                    request.user.push_notifications_enabled = prefs['push']
             if 'location_sharing' in prefs:
                 request.user.location_sharing_enabled = prefs['location_sharing']
             if 'dark_mode' in prefs:

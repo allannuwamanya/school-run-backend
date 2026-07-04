@@ -195,6 +195,7 @@ class AdminDriverListView(APIView):
             password="password",
             full_name=body.get("full_name", ""),
             role=CustomUser.Role.DRIVER,
+            push_notifications_enabled=True,
         )
         driver = Driver.objects.create(
             user=user,
