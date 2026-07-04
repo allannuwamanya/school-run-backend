@@ -107,6 +107,7 @@ class AdminOverviewView(APIView):
                     "icon": "check",
                     "title": f"{s.child.full_name} picked up",
                     "subtitle": f"{s.trip.driver.user.full_name} · {s.picked_at.strftime('%H:%M')}",
+                    "_at": s.picked_at,
                 }
             )
         for t in recent_txns:
@@ -116,6 +117,7 @@ class AdminOverviewView(APIView):
                     "icon": "payment",
                     "title": f"Payment received — {t.parent.user.full_name or t.parent.user.phone}",
                     "subtitle": f"₦{t.amount}",
+                    "_at": t.processed_at,
                 }
             )
         for i in recent_incidents:
@@ -125,9 +127,14 @@ class AdminOverviewView(APIView):
                     "icon": "panic" if i.severity == Incident.CRITICAL else "warning",
                     "title": i.get_incident_type_display(),
                     "subtitle": i.incident_id,
+                    "_at": i.created_at,
                 }
             )
-        activity.sort(key=lambda a: a["id"], reverse=True)
+        # Sort by actual event time, not the string id (which sorted by type
+        # prefix — "txn-"/"stop-"/"inc-" — not chronological order at all).
+        activity.sort(key=lambda a: a["_at"], reverse=True)
+        for a in activity:
+            del a["_at"]
 
         return ok(
             {

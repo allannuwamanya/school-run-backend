@@ -16,7 +16,7 @@ from children.models import Child, School, Schedule
 from trips.models import Trip, Stop, Assignment
 from trips.tasks import sync_trip_for_schedule
 
-from main.firebase_push import notify
+from main.firebase_push import notify, notify_admins
 
 from .serializers import (
     RegisterSerializer,
@@ -437,6 +437,23 @@ def process_stop_event(request, stop_id, kind):
             notif_body,
             {'kind': notif_kind, 'stop_id': str(stop.id)},
         )
+
+        if kind == 'pickup':
+            # Feeds the admin Overview's Live Activity panel in real time —
+            # the payload carries everything the panel needs to render the
+            # row, so the admin's browser never has to re-query the DB.
+            notify_admins(
+                Notification.Kind.SYSTEM,
+                notif_title,
+                notif_body,
+                {
+                    'kind': 'ADMIN_ACTIVITY',
+                    'icon': 'check',
+                    'activity_id': f'stop-{stop.id}',
+                    'title': notif_title,
+                    'subtitle': f'{request.user.full_name} · {stop.picked_at.strftime("%H:%M")}',
+                },
+            )
 
     next_stop = Stop.objects.filter(trip=trip, sequence__gt=stop.sequence, status=Stop.Status.UPCOMING).order_by('sequence').first()
     if next_stop:

@@ -90,3 +90,11 @@ def notify(recipient, kind: str, title: str, body: str, data: dict | None = None
     except Exception as exc:
         _log_error(f'send_push raised for user {recipient.pk}', str(exc))
     return notif
+
+
+def notify_admins(kind: str, title: str, body: str, data: dict | None = None):
+    """notify() every admin — powers the admin Overview's Live Activity feed
+    pushing new events straight to the browser instead of being polled."""
+    from accounts.models import CustomUser
+    for admin in CustomUser.objects.filter(role=CustomUser.Role.ADMIN):
+        notify(admin, kind, title, body, data)
