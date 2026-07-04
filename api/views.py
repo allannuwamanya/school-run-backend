@@ -1,6 +1,7 @@
 from math import radians, sin, cos, sqrt, asin
 
 from django.db import transaction
+from django.db.models import Prefetch
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -13,6 +14,8 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from accounts.models import CustomUser, Parent, Driver, Notification, Device
 from children.models import Child, School, Schedule
 from trips.models import Trip, Stop, Assignment
+
+from main.firebase_push import send_push
 
 from .serializers import (
     RegisterSerializer,
@@ -358,12 +361,21 @@ def process_stop_event(request, stop_id, kind):
             trip.save()
         stop.save()
 
-        Notification.objects.create(
+        notif = Notification.objects.create(
             recipient=stop.child.parent.user,
             kind='PICKUP' if kind == 'pickup' else 'DROPOFF',
             title=f'{stop.child.full_name} {"picked up" if kind == "pickup" else "dropped off"}',
             body=f'{stop.child.full_name} was {"collected" if kind == "pickup" else "dropped"} by {request.user.full_name}.',
         )
+        try:
+            send_push(
+                notif.recipient,
+                notif.title,
+                notif.body,
+                {'kind': notif.kind, 'stop_id': str(stop.id)},
+            )
+        except Exception:
+            pass
 
     next_stop = Stop.objects.filter(trip=trip, sequence__gt=stop.sequence, status=Stop.Status.UPCOMING).order_by('sequence').first()
     if next_stop:

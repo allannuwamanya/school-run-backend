@@ -35,6 +35,9 @@ python-dotenv==1.0.1
 # HTTP
 requests==2.32.3
 
+# Firebase Push
+firebase-admin==7.5.0
+
 # Utilities
 pytz==2025.2
 sqlparse==0.5.3

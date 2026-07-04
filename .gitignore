@@ -663,6 +663,12 @@ MigrationBackup/
 # Visual code studio
 .vscode/*
 
+# Firebase service account (contains secrets — NEVER commit)
+firebase-service-account.json
+
+# Local seed/test scripts
+seed_*.py
+
 # Static file
 static/*
 user_images/*
