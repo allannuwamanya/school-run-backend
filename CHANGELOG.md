@@ -114,3 +114,14 @@ This document keeps track of all completed components, database schemas, backgro
 
 ### 🐛 Bug Fixes
 * **[Fixed]** `StopEventResultSerializer.status` — changed from plain `CharField` to `SerializerMethodField` to read from `obj['stop']`, eliminating 500 error on every `POST /stops/{id}/pickup|dropoff|no-show`.
+
+---
+
+## 📅 Version 1.2.1 (Push Notifications — Actually Delivering)
+
+### 🔔 Firebase Push (`main/firebase_push.py`)
+* **[Fixed]** `send_push` queried `Device.token`, a field that doesn't exist (the model field is `fcm_token`) — raised `FieldError` on every call, silently swallowed by the caller's bare `except`, so no push notification had ever actually been sent.
+* **[Added]** Failed sends now log to `ErrorLog` instead of vanishing.
+* **[Added]** Unregistered device tokens are pruned automatically after a failed send.
+* **[Added]** Outgoing pushes carry a `WebpushFCMOptions` deep link (first HTTPS entry in `CORS_ALLOWED_ORIGINS`) so tapping a notification opens the PWA.
+* **[Added]** `notify()` helper centralizing "create `Notification` row + push it" — used by both the pickup/dropoff flow and the nightly manifest job, so the driver's "new pickup added" notification now pushes too (previously in-app only).
