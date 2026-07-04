@@ -334,8 +334,17 @@ def process_stop_event(request, stop_id, kind):
         serializer = StopNoShowSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        reason = serializer.validated_data['reason']
         stop.status = Stop.Status.NO_SHOW
         stop.save()
+
+        notify(
+            stop.child.parent.user,
+            Notification.Kind.SYSTEM,
+            f'{stop.child.full_name} marked as no-show',
+            f'{request.user.full_name} could not complete the stop for {stop.child.full_name}: {reason}',
+            {'kind': 'NO_SHOW', 'stop_id': str(stop.id)},
+        )
     else:
         serializer = StopEventSerializer(data=request.data)
         if not serializer.is_valid():
@@ -357,10 +366,21 @@ def process_stop_event(request, stop_id, kind):
             stop.status = Stop.Status.PICKED_UP
             stop.picked_at = timezone.now()
             stop.picked_point = point
+            notif_kind = Notification.Kind.PICKUP
+            notif_title = f'{stop.child.full_name} picked up'
+            notif_body = f'{stop.child.full_name} was collected by {request.user.full_name}.'
         else:
             stop.status = Stop.Status.DROPPED
             stop.dropped_at = timezone.now()
             stop.dropped_point = point
+            if trip.direction == Trip.Direction.TO_SCHOOL:
+                notif_kind = Notification.Kind.ARRIVAL
+                notif_title = f'{stop.child.full_name} arrived at school'
+                notif_body = f'{stop.child.full_name} was dropped at school by {request.user.full_name}.'
+            else:
+                notif_kind = Notification.Kind.DROPOFF
+                notif_title = f'{stop.child.full_name} dropped off'
+                notif_body = f'{stop.child.full_name} was dropped at home by {request.user.full_name}.'
         if trip.status == Trip.Status.SCHEDULED:
             trip.status = Trip.Status.IN_PROGRESS
             trip.save()
@@ -368,10 +388,10 @@ def process_stop_event(request, stop_id, kind):
 
         notify(
             stop.child.parent.user,
-            'PICKUP' if kind == 'pickup' else 'DROPOFF',
-            f'{stop.child.full_name} {"picked up" if kind == "pickup" else "dropped off"}',
-            f'{stop.child.full_name} was {"collected" if kind == "pickup" else "dropped"} by {request.user.full_name}.',
-            {'kind': 'PICKUP' if kind == 'pickup' else 'DROPOFF', 'stop_id': str(stop.id)},
+            notif_kind,
+            notif_title,
+            notif_body,
+            {'kind': notif_kind, 'stop_id': str(stop.id)},
         )
 
     next_stop = Stop.objects.filter(trip=trip, sequence__gt=stop.sequence, status=Stop.Status.UPCOMING).order_by('sequence').first()
