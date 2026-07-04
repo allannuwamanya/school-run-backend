@@ -5,8 +5,9 @@ from datetime import date, timedelta
 
 from celery import shared_task
 from django.db import transaction
+from django.db.models import Max
 
-from accounts.models import Driver
+from accounts.models import Driver, Notification
 from children.models import Child
 from trips.models import Assignment, Trip, Stop
 
@@ -150,3 +151,71 @@ def generate_daily_manifests(service_date: str | None = None) -> dict:
                 trips_created += 1
 
     return {"service_date": target.isoformat(), "trips_created": trips_created}
+
+
+# ---------------------------------------------------------------------------
+# Reactive sync (on schedule save)
+# ---------------------------------------------------------------------------
+def _ensure_trip(driver: Driver, service_date: date, direction: str) -> Trip:
+    trip, _ = Trip.objects.get_or_create(
+        driver=driver, service_date=service_date, direction=direction,
+        defaults={"status": Trip.Status.SCHEDULED},
+    )
+    return trip
+
+
+def _append_stop_if_missing(trip: Trip, child: Child, direction: str) -> bool:
+    """Adds a Stop for `child` on `trip` if it doesn't already have one,
+    appended after the current last stop rather than re-running the
+    nearest-neighbour ordering — safe to call on a trip that's already in
+    progress, at the cost of not re-optimizing the route."""
+    if Stop.objects.filter(trip=trip, child=child).exists():
+        return False
+    sched = getattr(child, "schedule", None)
+    eta = None
+    if sched:
+        eta = sched.morning_time if direction == Trip.Direction.TO_SCHOOL else sched.afternoon_time
+    next_seq = (trip.stops.aggregate(Max("sequence"))["sequence__max"] or 0) + 1
+    Stop.objects.create(trip=trip, child=child, sequence=next_seq, status=Stop.Status.UPCOMING, eta=eta)
+    return True
+
+
+@transaction.atomic
+def sync_trip_for_schedule(child: Child) -> None:
+    """
+    Reactive counterpart to generate_daily_manifests: called right after a
+    parent saves a child's schedule, so the driver's manifest reflects it
+    immediately instead of waiting on the nightly batch job — which nothing
+    currently schedules to run anyway. Only builds/updates TODAY's trip;
+    future days still rely on generate_daily_manifests once that's wired
+    into an actual nightly job.
+    """
+    assignment = (
+        Assignment.objects.filter(parent_id=child.parent_id, is_active=True)
+        .select_related("driver__user")
+        .first()
+    )
+    if not assignment or not assignment.driver.is_verified:
+        return
+    driver = assignment.driver
+
+    sched = getattr(child, "schedule", None)
+    if not sched:
+        return
+    today = date.today()
+    if today.isoweekday() not in (sched.days or []):
+        return
+
+    added = False
+    for direction in (Trip.Direction.TO_SCHOOL, Trip.Direction.TO_HOME):
+        trip = _ensure_trip(driver, today, direction)
+        if _append_stop_if_missing(trip, child, direction):
+            added = True
+
+    if added:
+        Notification.objects.create(
+            recipient=driver.user,
+            kind=Notification.Kind.SYSTEM,
+            title="New pickup added to today's route",
+            body=f"{child.full_name} was scheduled and added to your route today.",
+        )

@@ -14,6 +14,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from accounts.models import CustomUser, Parent, Driver, Notification, Device
 from children.models import Child, School, Schedule
 from trips.models import Trip, Stop, Assignment
+from trips.tasks import sync_trip_for_schedule
 
 from main.firebase_push import send_push
 
@@ -225,6 +226,7 @@ class ChildScheduleView(APIView):
             child=child,
             defaults=data,
         )
+        sync_trip_for_schedule(child)
         return ok({
             'morning_time': schedule.morning_time.strftime('%H:%M'),
             'afternoon_time': schedule.afternoon_time.strftime('%H:%M'),
