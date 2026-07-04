@@ -33,6 +33,7 @@ from .serializers import (
     ManifestSerializer,
     ManifestTripSerializer,
     StopEventSerializer,
+    DriverLocationPingSerializer,
     StopNoShowSerializer,
     StopEventResultSerializer,
     HistoryRowSerializer,
@@ -341,6 +342,27 @@ class TripCompleteView(APIView):
             'direction': trip.direction,
             'status': trip.status,
         })
+
+
+class DriverLocationPingView(APIView):
+    """Foreground-only location ping sent by the driver's nav screen while a
+    trip is in progress — powers the admin dispatch map's live van position.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if request.user.role != CustomUser.Role.DRIVER:
+            return err('Only drivers can send location pings.', 403)
+        serializer = DriverLocationPingSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        data = serializer.validated_data
+        from main.gis_fallback import GeoPoint
+        driver = request.user.driver
+        driver.last_point = GeoPoint(data['lng'], data['lat'])
+        driver.last_seen_at = timezone.now()
+        driver.save(update_fields=['last_point', 'last_seen_at'])
+        return Response(None, status=status.HTTP_204_NO_CONTENT)
 
 
 GPS_TOLERANCE_M = 100

@@ -374,6 +374,11 @@ class StopEventSerializer(serializers.Serializer):
     lng = serializers.FloatField(required=False)
 
 
+class DriverLocationPingSerializer(serializers.Serializer):
+    lat = serializers.FloatField()
+    lng = serializers.FloatField()
+
+
 class StopNoShowSerializer(serializers.Serializer):
     reason = serializers.CharField()
 

@@ -8,6 +8,8 @@ to compare against yet, so they're computed as real aggregates over current
 data rather than fabricated — trend fields report 0 until that history
 exists.
 """
+from datetime import timedelta
+
 from django.utils import timezone
 
 from accounts.models import CustomUser, VerificationDocument
@@ -302,10 +304,23 @@ def _trip_fleet_status(trip):
     return "EN_ROUTE"
 
 
+LIVE_PING_STALE_AFTER = timedelta(minutes=2)
+
+
 def _trip_current_point(trip):
-    """Approximate the van's current position from its current/next stop —
-    there's no continuous live-location ping model, only one-shot GPS stamped
-    on pickup/dropoff, so this tracks the *target* stop rather than a live fix."""
+    """The van's live position, from the driver's nav-screen location pings
+    (foreground-only — see DriverLocationPingView). Falls back to the
+    target/last stop's fixed coordinate if the driver hasn't pinged recently
+    (nav screen closed, trip not actually being driven yet, etc.)."""
+    driver = trip.driver
+    if (
+        driver.last_point
+        and driver.last_seen_at
+        and timezone.now() - driver.last_seen_at <= LIVE_PING_STALE_AFTER
+    ):
+        p = driver.last_point
+        return {"lat": float(p.y), "lng": float(p.x)}
+
     next_stop = trip.stops.filter(status=Stop.Status.NEXT).select_related("child").first()
     if next_stop and next_stop.child.pickup_point:
         p = next_stop.child.pickup_point

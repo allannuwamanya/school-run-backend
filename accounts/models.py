@@ -5,6 +5,8 @@ from django.contrib.auth.models import PermissionsMixin
 from django.db import models
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from main.gis_fallback import PointField
+
 # ---------------------------------------------------------------------------
 # Shared base
 # ---------------------------------------------------------------------------
@@ -130,6 +132,13 @@ class Driver(Base):
         "zones.Zone", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="driver_profiles",
     )
+
+    # Foreground-only live tracking: pinged periodically by the nav screen
+    # while a trip is in progress (see api/views.py DriverLocationPingView).
+    # No screen open, no pings — the admin dispatch map falls back to the
+    # target stop's fixed coordinate once this goes stale.
+    last_point = PointField(geography=True, null=True, blank=True)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.user.full_name or self.user.phone} ({self.plate})"
