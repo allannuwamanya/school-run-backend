@@ -9,6 +9,7 @@ from django.db.models import Max
 
 from accounts.models import Driver, Notification
 from children.models import Child
+from main.firebase_push import notify
 from trips.models import Assignment, Trip, Stop
 
 
@@ -213,9 +214,9 @@ def sync_trip_for_schedule(child: Child) -> None:
             added = True
 
     if added:
-        Notification.objects.create(
-            recipient=driver.user,
-            kind=Notification.Kind.SYSTEM,
-            title="New pickup added to today's route",
-            body=f"{child.full_name} was scheduled and added to your route today.",
+        notify(
+            driver.user,
+            Notification.Kind.SYSTEM,
+            "New pickup added to today's route",
+            f"{child.full_name} was scheduled and added to your route today.",
         )

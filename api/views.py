@@ -16,7 +16,7 @@ from children.models import Child, School, Schedule
 from trips.models import Trip, Stop, Assignment
 from trips.tasks import sync_trip_for_schedule
 
-from main.firebase_push import send_push
+from main.firebase_push import notify
 
 from .serializers import (
     RegisterSerializer,
@@ -363,21 +363,13 @@ def process_stop_event(request, stop_id, kind):
             trip.save()
         stop.save()
 
-        notif = Notification.objects.create(
-            recipient=stop.child.parent.user,
-            kind='PICKUP' if kind == 'pickup' else 'DROPOFF',
-            title=f'{stop.child.full_name} {"picked up" if kind == "pickup" else "dropped off"}',
-            body=f'{stop.child.full_name} was {"collected" if kind == "pickup" else "dropped"} by {request.user.full_name}.',
+        notify(
+            stop.child.parent.user,
+            'PICKUP' if kind == 'pickup' else 'DROPOFF',
+            f'{stop.child.full_name} {"picked up" if kind == "pickup" else "dropped off"}',
+            f'{stop.child.full_name} was {"collected" if kind == "pickup" else "dropped"} by {request.user.full_name}.',
+            {'kind': 'PICKUP' if kind == 'pickup' else 'DROPOFF', 'stop_id': str(stop.id)},
         )
-        try:
-            send_push(
-                notif.recipient,
-                notif.title,
-                notif.body,
-                {'kind': notif.kind, 'stop_id': str(stop.id)},
-            )
-        except Exception:
-            pass
 
     next_stop = Stop.objects.filter(trip=trip, sequence__gt=stop.sequence, status=Stop.Status.UPCOMING).order_by('sequence').first()
     if next_stop:
