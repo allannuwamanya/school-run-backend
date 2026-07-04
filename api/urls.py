@@ -10,6 +10,7 @@ urlpatterns = [
     # Auth (contract paths)
     path('auth/register', views.RegisterView.as_view(), name='auth-register'),
     path('auth/login', views.LoginView.as_view(), name='auth-login'),
+    path('auth/google', views.GoogleLoginView.as_view(), name='auth-google'),
     path('auth/refresh', TokenRefreshView.as_view(), name='auth-refresh'),
     # Account
     path('me', views.MeView.as_view(), name='api-me'),

@@ -215,6 +215,10 @@ CORS_ALLOWED_ORIGINS = allowed_origins_str.split(
 trusted_origins_str = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
 CSRF_TRUSTED_ORIGINS = trusted_origins_str.split(
     ',') if trusted_origins_str else []
+
+# OAuth audience for verifying Google Identity Services ID tokens (see
+# api/serializers.py GoogleLoginSerializer). Not a secret — safe to expose.
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 JAZZMIN_SETTINGS = {
     "site_title": os.environ.get('SITE_NAME', 'SchoolRun'),
     "site_brand": f"{os.environ.get('SITE_NAME', 'SchoolRun')} Admin",

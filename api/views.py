@@ -21,6 +21,7 @@ from main.firebase_push import notify
 from .serializers import (
     RegisterSerializer,
     LoginSerializer,
+    GoogleLoginSerializer,
     MeSerializer,
     MePatchSerializer,
     SchoolSerializer,
@@ -84,6 +85,27 @@ class LoginView(APIView):
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
+        user = serializer.validated_data['user']
+        tokens = user.tokens()
+        return Response({
+            'access': tokens['access'],
+            'refresh': tokens['refresh'],
+            'user': {
+                'id': user.id,
+                'role': user.role,
+                'full_name': user.full_name,
+                'phone': user.phone,
+            },
+        })
+
+
+class GoogleLoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = GoogleLoginSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
         user = serializer.validated_data['user']

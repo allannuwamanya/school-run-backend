@@ -60,7 +60,9 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     first_name = None
     last_name = None
 
-    phone = models.CharField(max_length=20, unique=True)
+    # Nullable to allow Google-only accounts (no phone collected at sign-in);
+    # a unique column permits multiple NULLs on both Postgres and SQLite.
+    phone = models.CharField(max_length=20, unique=True, null=True, blank=True)
     email = models.EmailField(max_length=200, null=True, blank=True)
     full_name = models.CharField(max_length=120, blank=True)
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.PARENT)

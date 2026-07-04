@@ -37,6 +37,7 @@ requests==2.32.3
 
 # Firebase Push
 firebase-admin==7.5.0
+google-auth==2.55.1
 
 # Utilities
 pytz==2025.2

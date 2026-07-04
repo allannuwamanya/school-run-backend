@@ -58,6 +58,45 @@ class LoginSerializer(serializers.Serializer):
         return attrs
 
 
+class GoogleLoginSerializer(serializers.Serializer):
+    credential = serializers.CharField()
+
+    def validate(self, attrs):
+        from google.auth.transport import requests as google_requests
+        from google.oauth2 import id_token as google_id_token
+        from django.conf import settings
+
+        try:
+            idinfo = google_id_token.verify_oauth2_token(
+                attrs['credential'], google_requests.Request(), settings.GOOGLE_CLIENT_ID,
+            )
+        except ValueError:
+            raise serializers.ValidationError('Invalid Google credential.')
+
+        email = idinfo.get('email')
+        if not email or not idinfo.get('email_verified'):
+            raise serializers.ValidationError('Google account has no verified email.')
+
+        user = CustomUser.objects.filter(email__iexact=email).first()
+        if not user:
+            # phone=None (not the CharField default of '') so a unique
+            # constraint allows any number of Google-only accounts.
+            user = CustomUser(
+                phone=None,
+                email=email,
+                full_name=idinfo.get('name', ''),
+                role=CustomUser.Role.PARENT,
+            )
+            user.set_unusable_password()
+            user.save()
+            Parent.objects.create(user=user)
+
+        if not user.is_active:
+            raise serializers.ValidationError('Account disabled.')
+        attrs['user'] = user
+        return attrs
+
+
 class MeSerializer(serializers.Serializer):
     user = serializers.SerializerMethodField()
     is_verified = serializers.SerializerMethodField()
