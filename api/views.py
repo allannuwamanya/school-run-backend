@@ -1,3 +1,4 @@
+from datetime import timedelta
 from math import radians, sin, cos, sqrt, asin
 
 from django.db import transaction
@@ -13,7 +14,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from accounts.models import CustomUser, Parent, Driver, Notification, Device
 from children.models import Child, School, Schedule
-from trips.models import Trip, Stop, Assignment
+from trips.models import Trip, Stop, Assignment, LocationPing
 from trips.tasks import sync_trip_for_schedule
 
 from main.firebase_push import notify, notify_admins
@@ -359,9 +360,16 @@ class DriverLocationPingView(APIView):
         data = serializer.validated_data
         from main.gis_fallback import GeoPoint
         driver = request.user.driver
-        driver.last_point = GeoPoint(data['lng'], data['lat'])
+        point = GeoPoint(data['lng'], data['lat'])
+        driver.last_point = point
         driver.last_seen_at = timezone.now()
         driver.save(update_fields=['last_point', 'last_seen_at'])
+        LocationPing.objects.create(driver=driver, point=point)
+        # Trail only ever needs the last hour — prune older fixes on write
+        # rather than running a separate cleanup job.
+        LocationPing.objects.filter(
+            driver=driver, created_at__lt=timezone.now() - timedelta(hours=1)
+        ).delete()
         return Response(None, status=status.HTTP_204_NO_CONTENT)
 
 

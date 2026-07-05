@@ -110,6 +110,21 @@ class Stop(Base):
         return f"#{self.sequence} {self.child.full_name} ({self.get_status_display()})"
 
 
+class LocationPing(Base):
+    """Historical GPS fixes from a driver's nav screen (see
+    DriverLocationPingView) — powers the admin dispatch map's breadcrumb
+    trail. Distinct from Driver.last_point, which only holds the latest fix
+    and gets overwritten on every ping."""
+    driver = models.ForeignKey(Driver, on_delete=models.CASCADE, related_name="location_pings")
+    point = PointField(geography=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["driver", "created_at"])]
+
+    def __str__(self):
+        return f"{self.driver.user.full_name} @ {self.created_at:%H:%M:%S}"
+
+
 class LiveLocation(models.Model):
     """Last known GPS position of a driver (optional extension)."""
     driver = models.OneToOneField(

@@ -77,6 +77,7 @@ urlpatterns = [
     path('admin/zones', admin_views.AdminZoneListView.as_view(), name='admin-zones'),
     path('admin/dispatch', admin_views.AdminDispatchView.as_view(), name='admin-dispatch'),
     path('admin/dispatch/emergency', admin_views.AdminEmergencyDispatchView.as_view(), name='admin-dispatch-emergency'),
+    path('admin/dispatch/<uuid:trip_id>/trail', admin_views.AdminDriverTrailView.as_view(), name='admin-dispatch-trail'),
     path('admin/payments', admin_views.AdminPaymentsView.as_view(), name='admin-payments'),
     path(
         'admin/payments/<uuid:pk>/refund',

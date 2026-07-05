@@ -12,7 +12,7 @@ from children.models import Child
 from incidents.models import Incident, IncidentTimeline
 from main.firebase_push import notify, notify_admins
 from payments.models import Subscription, Transaction
-from trips.models import Assignment, Stop, Trip
+from trips.models import Assignment, LocationPing, Stop, Trip
 from trips.tasks import sync_trip_for_schedule
 from zones.models import Zone
 
@@ -466,6 +466,29 @@ class AdminDispatchView(APIView):
                     {"id": str(d.id), "driver_name": d.user.full_name, "phone": d.user.phone, "plate": d.plate}
                     for d in idle_drivers
                 ],
+            }
+        )
+
+
+class AdminDriverTrailView(APIView):
+    """Breadcrumb trail of a van's recent GPS fixes, for the Dispatch map's
+    Track view. Defaults to the last 30 minutes, clamped to the trip's own
+    start so it never bleeds in fixes from an earlier trip that day."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request, trip_id):
+        trip = get_object_or_404(Trip, id=trip_id)
+        minutes = int(request.query_params.get("minutes", 30))
+        since = timezone.now() - timedelta(minutes=minutes)
+        if trip.started_at and trip.started_at > since:
+            since = trip.started_at
+
+        pings = LocationPing.objects.filter(driver=trip.driver, created_at__gte=since).order_by("created_at")
+        return ok(
+            {
+                "points": [
+                    {"lat": p.point.y, "lng": p.point.x, "at": p.created_at.isoformat()} for p in pings
+                ]
             }
         )
 
