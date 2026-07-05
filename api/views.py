@@ -12,6 +12,8 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from .admin_permissions import IsAdmin
+
 from accounts.models import CustomUser, Parent, Driver, Notification, Device
 from children.models import Child, School, Schedule
 from trips.models import Trip, Stop, Assignment, LocationPing
@@ -156,7 +158,10 @@ class MeView(APIView):
 
 
 class SchoolListView(APIView):
-    permission_classes = [IsAuthenticated]
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsAdmin()]
+        return [IsAuthenticated()]
 
     def get(self, request):
         q = request.query_params.get('q', '')
@@ -165,6 +170,12 @@ class SchoolListView(APIView):
             schools = schools.filter(name__icontains=q)
         serializer = SchoolSerializer(schools, many=True)
         return ok(serializer.data)
+
+    def post(self, request):
+        serializer = SchoolSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return ok(serializer.data, status_code=201)
 
 
 class ChildListCreateView(APIView):
