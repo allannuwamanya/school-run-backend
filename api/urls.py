@@ -52,6 +52,7 @@ urlpatterns = [
         name='admin-driver-request-docs',
     ),
     path('admin/parents', admin_views.AdminParentListView.as_view(), name='admin-parents'),
+    path('admin/parents/<uuid:pk>', admin_views.AdminParentDetailView.as_view(), name='admin-parent-detail'),
     path('admin/parents/<uuid:pk>/suspend', admin_views.AdminParentSuspendView.as_view(), name='admin-parent-suspend'),
     path(
         'admin/parents/<uuid:pk>/assign-driver',

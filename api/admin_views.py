@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.core.paginator import Paginator
 from django.db.models import Avg, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -22,11 +23,14 @@ from .admin_serializers import (
     serialize_fleet_van,
     serialize_incident,
     serialize_incident_detail,
+    serialize_parent_detail,
     serialize_parent_row,
     serialize_route,
     serialize_transaction,
     serialize_zone,
 )
+
+PARENT_PAGE_SIZE = 20
 
 
 def ok(data, status_code=200):
@@ -260,11 +264,39 @@ class AdminParentListView(APIView):
 
     def get(self, request):
         parents = Parent.objects.select_related("user", "zone").prefetch_related("subscriptions", "children")
-        rows = [serialize_parent_row(p) for p in parents]
+        pairs = [(p, serialize_parent_row(p)) for p in parents]
+
+        q = (request.query_params.get("q") or "").strip().lower()
+        if q:
+            pairs = [
+                (p, r) for p, r in pairs
+                if q in r["full_name"].lower() or q in r["phone"].lower() or q in r["zone"].lower()
+            ]
 
         status_filter = request.query_params.get("status")
         if status_filter:
-            rows = [r for r in rows if r["account_status"].lower() == status_filter.lower()]
+            pairs = [(p, r) for p, r in pairs if r["account_status"].lower() == status_filter.lower()]
+
+        zone_filter = request.query_params.get("zone")
+        if zone_filter:
+            pairs = [(p, r) for p, r in pairs if r["zone"].lower() == zone_filter.lower()]
+
+        plan_filter = request.query_params.get("plan")
+        if plan_filter:
+            pairs = [(p, r) for p, r in pairs if r["plan"].lower() == plan_filter.lower()]
+
+        ordering = request.query_params.get("ordering", "-created_at")
+        if ordering == "created_at":
+            pairs.sort(key=lambda pr: pr[0].created_at)
+        elif ordering == "full_name":
+            pairs.sort(key=lambda pr: pr[1]["full_name"].lower())
+        else:
+            pairs.sort(key=lambda pr: pr[0].created_at, reverse=True)
+
+        count = len(pairs)
+        page = max(int(request.query_params.get("page") or 1), 1)
+        paginator = Paginator([r for _, r in pairs], PARENT_PAGE_SIZE)
+        page_results = list(paginator.get_page(page).object_list)
 
         return ok(
             {
@@ -275,9 +307,45 @@ class AdminParentListView(APIView):
                     "overdue_payments": Subscription.objects.filter(status=Subscription.OVERDUE).count(),
                     "total_children": Child.objects.filter(is_active=True).count(),
                 },
-                "results": rows,
+                "count": count,
+                "results": page_results,
             }
         )
+
+    def post(self, request):
+        body = request.data
+        phone = (body.get("phone") or "").replace(" ", "")
+        if not phone:
+            return err("phone is required.", 400)
+        if CustomUser.objects.filter(phone=phone).exists():
+            return err("A user with this phone already exists.", 409)
+
+        zone = None
+        zone_name = (body.get("zone") or "").strip()
+        if zone_name and zone_name.lower() != "unassigned":
+            zone = Zone.objects.filter(name__iexact=zone_name).first()
+
+        user = CustomUser.objects.create_user(
+            phone=phone,
+            password="password",
+            full_name=body.get("full_name", ""),
+            role=CustomUser.Role.PARENT,
+            push_notifications_enabled=True,
+        )
+        parent = Parent.objects.create(
+            user=user,
+            emergency_contact=body.get("emergency_contact", ""),
+            zone=zone,
+        )
+        return ok(serialize_parent_row(parent), 201)
+
+
+class AdminParentDetailView(APIView):
+    permission_classes = [IsAdmin]
+
+    def get(self, request, pk):
+        parent = get_object_or_404(Parent.objects.select_related("user", "zone"), pk=pk)
+        return ok(serialize_parent_detail(parent))
 
 
 class AdminParentSuspendView(APIView):
@@ -299,6 +367,8 @@ class AdminParentAssignDriverView(APIView):
         if not driver_id:
             return err("driver_id is required.", 400)
         driver = get_object_or_404(Driver, pk=driver_id)
+        if not driver.is_verified:
+            return err("Driver is not approved yet.", 400)
 
         Assignment.objects.filter(parent=parent, is_active=True).update(is_active=False)
         Assignment.objects.create(parent=parent, driver=driver, is_active=True)

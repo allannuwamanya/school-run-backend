@@ -146,10 +146,33 @@ def serialize_parent_row(parent):
         "children_count": parent.children.filter(is_active=True).count(),
         "zone": _zone_name(parent),
         "plan": _plan_tier(sub),
+        "driver_id": str(assignment.driver_id) if assignment else None,
         "driver_name": assignment.driver.user.full_name if assignment else None,
         "last_active": parent.user.last_login.isoformat() if parent.user.last_login else "Never",
         "id_status": "VERIFIED" if parent.user.nin_verified else "PENDING_NIN",
         "account_status": _parent_account_status(parent, sub),
+    }
+
+
+def serialize_parent_detail(parent):
+    assignment = Assignment.objects.filter(parent=parent, is_active=True).select_related("driver__user").first()
+    driver = None
+    if assignment:
+        driver = {
+            "id": str(assignment.driver_id),
+            "full_name": assignment.driver.user.full_name,
+            "phone": assignment.driver.user.phone,
+            "plate": assignment.driver.plate,
+        }
+    return {
+        **serialize_parent_row(parent),
+        "emergency_contact": parent.emergency_contact,
+        "joined": parent.created_at.date().isoformat(),
+        "children": [
+            {"id": str(c.id), "full_name": c.full_name, "school_name": c.school.name}
+            for c in parent.children.filter(is_active=True).select_related("school")
+        ],
+        "driver": driver,
     }
 
 
