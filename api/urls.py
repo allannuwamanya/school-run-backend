@@ -64,6 +64,16 @@ urlpatterns = [
         admin_views.AdminParentUnassignDriverView.as_view(),
         name='admin-parent-unassign-driver',
     ),
+    path(
+        'admin/parents/<uuid:pk>/verify-nin',
+        admin_views.AdminParentVerifyNinView.as_view(),
+        name='admin-parent-verify-nin',
+    ),
+    path(
+        'admin/parents/<uuid:pk>/reject-nin',
+        admin_views.AdminParentRejectNinView.as_view(),
+        name='admin-parent-reject-nin',
+    ),
     path('admin/zones', admin_views.AdminZoneListView.as_view(), name='admin-zones'),
     path('admin/dispatch', admin_views.AdminDispatchView.as_view(), name='admin-dispatch'),
     path('admin/dispatch/emergency', admin_views.AdminEmergencyDispatchView.as_view(), name='admin-dispatch-emergency'),

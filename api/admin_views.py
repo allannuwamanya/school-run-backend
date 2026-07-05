@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from accounts.models import CustomUser, Driver, Notification, Parent, VerificationDocument
 from children.models import Child
 from incidents.models import Incident, IncidentTimeline
-from main.firebase_push import notify_admins
+from main.firebase_push import notify, notify_admins
 from payments.models import Subscription, Transaction
 from trips.models import Assignment, Stop, Trip
 from trips.tasks import sync_trip_for_schedule
@@ -356,6 +356,38 @@ class AdminParentSuspendView(APIView):
         parent = get_object_or_404(Parent.objects.select_related("user"), pk=pk)
         parent.user.is_active = not parent.user.is_active
         parent.user.save()
+        return ok(serialize_parent_row(parent))
+
+
+class AdminParentVerifyNinView(APIView):
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        parent = get_object_or_404(Parent.objects.select_related("user"), pk=pk)
+        parent.user.nin_verified = True
+        parent.user.save()
+        notify(
+            parent.user,
+            Notification.Kind.SYSTEM,
+            "ID verification approved",
+            "Your identity verification is complete.",
+        )
+        return ok(serialize_parent_row(parent))
+
+
+class AdminParentRejectNinView(APIView):
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        parent = get_object_or_404(Parent.objects.select_related("user"), pk=pk)
+        parent.user.nin_verified = False
+        parent.user.save()
+        notify(
+            parent.user,
+            Notification.Kind.SYSTEM,
+            "ID verification rejected",
+            "We couldn't verify your ID — please resubmit your NIN details.",
+        )
         return ok(serialize_parent_row(parent))
 
 
