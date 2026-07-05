@@ -7,9 +7,10 @@ from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import CustomUser, Driver, Parent, VerificationDocument
+from accounts.models import CustomUser, Driver, Notification, Parent, VerificationDocument
 from children.models import Child
 from incidents.models import Incident, IncidentTimeline
+from main.firebase_push import notify_admins
 from payments.models import Subscription, Transaction
 from trips.models import Assignment, Stop, Trip
 from trips.tasks import sync_trip_for_schedule
@@ -430,11 +431,52 @@ class AdminDispatchView(APIView):
                 },
                 "fleet": [serialize_fleet_van(t) for t in active_trips],
                 "idle": [
-                    {"id": str(d.id), "driver_name": d.user.full_name, "plate": d.plate}
+                    {"id": str(d.id), "driver_name": d.user.full_name, "phone": d.user.phone, "plate": d.plate}
                     for d in idle_drivers
                 ],
             }
         )
+
+
+class AdminEmergencyDispatchView(APIView):
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        trip_id = request.data.get("trip_id")
+        trip = get_object_or_404(Trip, id=trip_id, status=Trip.Status.IN_PROGRESS)
+
+        last = Incident.objects.order_by("-incident_id").values_list("incident_id", flat=True).first()
+        next_num = int(last.split("-")[-1]) + 1 if last and last.split("-")[-1].isdigit() else 1
+        incident = Incident.objects.create(
+            incident_id=f"INC-{next_num:03d}",
+            incident_type=Incident.PANIC_ALERT,
+            severity=Incident.CRITICAL,
+            status=Incident.OPEN,
+            triggered_by=request.user,
+            trip=trip,
+        )
+        IncidentTimeline.objects.create(
+            incident=incident,
+            actor=request.user,
+            event_text=f"Emergency dispatch triggered by {request.user.full_name} for {trip.driver.user.full_name}'s van.",
+        )
+
+        title = "Emergency dispatch triggered"
+        subtitle = f"{trip.driver.user.full_name} · {incident.incident_id}"
+        notify_admins(
+            Notification.Kind.SYSTEM,
+            title,
+            subtitle,
+            {
+                "kind": "ADMIN_ACTIVITY",
+                "icon": "panic",
+                "activity_id": f"incident-{incident.id}",
+                "title": title,
+                "subtitle": subtitle,
+            },
+        )
+
+        return ok(serialize_incident_detail(incident), 201)
 
 
 class AdminPaymentsView(APIView):

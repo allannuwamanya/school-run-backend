@@ -359,6 +359,7 @@ def serialize_fleet_van(trip):
     return {
         "id": str(trip.id),
         "driver_name": trip.driver.user.full_name,
+        "driver_phone": trip.driver.user.phone,
         "plate": trip.driver.plate,
         "status": _trip_fleet_status(trip),
         "point": _trip_current_point(trip),
