@@ -383,6 +383,21 @@ class StopNoShowSerializer(serializers.Serializer):
     reason = serializers.CharField()
 
 
+class IncidentReportSerializer(serializers.Serializer):
+    """Self-report from a driver or parent (Trust & Safety screens) — the
+    unhappy-path complement to the panic button, which stays deferred to
+    Phase 3. Deliberately excludes `panic_alert`: that path is reserved for
+    the not-yet-built panic flow so self-reports can't masquerade as one."""
+    incident_type = serializers.ChoiceField(
+        choices=["SICK_CHILD", "ROUTE_DEVIATION", "OTHER"],
+        required=False,
+        default="OTHER",
+    )
+    description = serializers.CharField(max_length=500)
+    trip_id = serializers.UUIDField(required=False, allow_null=True)
+    child_id = serializers.UUIDField(required=False, allow_null=True)
+
+
 class StopEventResultSerializer(serializers.Serializer):
     id = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()

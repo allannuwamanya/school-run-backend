@@ -500,10 +500,8 @@ class AdminEmergencyDispatchView(APIView):
         trip_id = request.data.get("trip_id")
         trip = get_object_or_404(Trip, id=trip_id, status=Trip.Status.IN_PROGRESS)
 
-        last = Incident.objects.order_by("-incident_id").values_list("incident_id", flat=True).first()
-        next_num = int(last.split("-")[-1]) + 1 if last and last.split("-")[-1].isdigit() else 1
         incident = Incident.objects.create(
-            incident_id=f"INC-{next_num:03d}",
+            incident_id=Incident.next_incident_id(),
             incident_type=Incident.PANIC_ALERT,
             severity=Incident.CRITICAL,
             status=Incident.OPEN,

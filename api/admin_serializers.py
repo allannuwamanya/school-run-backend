@@ -212,6 +212,8 @@ INCIDENT_TYPE_MAP = {
     Incident.ROUTE_DEVIATION: "ROUTE_DEVIATION",
     Incident.LATE_PICKUP: "LATE_PICKUP",
     Incident.SICK_CHILD: "SICK_CHILD",
+    Incident.NO_SHOW: "NO_SHOW",
+    Incident.OTHER: "OTHER",
 }
 SEVERITY_MAP = {
     Incident.CRITICAL: "CRITICAL",

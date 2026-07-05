@@ -16,6 +16,7 @@ from accounts.models import CustomUser, Parent, Driver, Notification, Device
 from children.models import Child, School, Schedule
 from trips.models import Trip, Stop, Assignment, LocationPing
 from trips.tasks import sync_trip_for_schedule
+from incidents.models import Incident, IncidentTimeline
 
 from main.firebase_push import notify, notify_admins
 
@@ -37,6 +38,7 @@ from .serializers import (
     DriverLocationPingSerializer,
     StopNoShowSerializer,
     StopEventResultSerializer,
+    IncidentReportSerializer,
     HistoryRowSerializer,
     NotificationSerializer,
     NotificationsReadSerializer,
@@ -397,6 +399,39 @@ def process_stop_event(request, stop_id, kind):
             f'{request.user.full_name} could not complete the stop for {stop.child.full_name}: {reason}',
             {'kind': 'NO_SHOW', 'stop_id': str(stop.id)},
         )
+
+        # A no-show can't just sit in the parent's notification feed — ops
+        # needs to know a child wasn't collected while there's still time to
+        # act, so it's escalated the same way an admin-triggered emergency
+        # dispatch is (see AdminEmergencyDispatchView).
+        incident = Incident.objects.create(
+            incident_id=Incident.next_incident_id(),
+            incident_type=Incident.NO_SHOW,
+            severity=Incident.MEDIUM,
+            status=Incident.OPEN,
+            triggered_by=request.user,
+            trip=trip,
+            child=stop.child,
+        )
+        IncidentTimeline.objects.create(
+            incident=incident,
+            actor=request.user,
+            event_text=f'No-show reported by {request.user.full_name}: {reason}',
+        )
+        admin_title = 'No-show reported'
+        admin_subtitle = f'{stop.child.full_name} · {incident.incident_id}'
+        notify_admins(
+            Notification.Kind.SYSTEM,
+            admin_title,
+            admin_subtitle,
+            {
+                'kind': 'ADMIN_ACTIVITY',
+                'icon': 'warning',
+                'activity_id': f'incident-{incident.id}',
+                'title': admin_title,
+                'subtitle': admin_subtitle,
+            },
+        )
     else:
         serializer = StopEventSerializer(data=request.data)
         if not serializer.is_valid():
@@ -497,6 +532,72 @@ class StopNoShowView(APIView):
 
     def post(self, request, pk):
         return process_stop_event(request, pk, 'no-show')
+
+
+INCIDENT_TYPE_FROM_CONTRACT = {
+    'SICK_CHILD': Incident.SICK_CHILD,
+    'ROUTE_DEVIATION': Incident.ROUTE_DEVIATION,
+    'OTHER': Incident.OTHER,
+}
+
+
+class IncidentReportView(APIView):
+    """Lets a driver or parent flag a problem outside the no-show flow (e.g.
+    a sick child, a blocked route, a wrong pickup point) — the Trust & Safety
+    screens' non-panic escalation path. Panic itself stays deferred (Phase 3);
+    this never accepts `panic_alert` so a self-report can't impersonate one."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = IncidentReportSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        data = serializer.validated_data
+
+        trip = None
+        if data.get('trip_id'):
+            trip_qs = Trip.objects.all()
+            if request.user.role == CustomUser.Role.DRIVER:
+                trip_qs = trip_qs.filter(driver__user=request.user)
+            trip = get_object_or_404(trip_qs, id=data['trip_id'])
+
+        child = None
+        if data.get('child_id'):
+            child_qs = Child.objects.all()
+            if request.user.role == CustomUser.Role.PARENT:
+                child_qs = child_qs.filter(parent__user=request.user)
+            child = get_object_or_404(child_qs, id=data['child_id'])
+
+        incident = Incident.objects.create(
+            incident_id=Incident.next_incident_id(),
+            incident_type=INCIDENT_TYPE_FROM_CONTRACT[data['incident_type']],
+            severity=Incident.MEDIUM,
+            status=Incident.OPEN,
+            triggered_by=request.user,
+            trip=trip,
+            child=child,
+        )
+        who = request.user.full_name or request.user.phone
+        IncidentTimeline.objects.create(
+            incident=incident,
+            actor=request.user,
+            event_text=f'Reported by {who}: {data["description"]}',
+        )
+        admin_title = 'New incident reported'
+        admin_subtitle = f'{who} · {incident.incident_id}'
+        notify_admins(
+            Notification.Kind.SYSTEM,
+            admin_title,
+            admin_subtitle,
+            {
+                'kind': 'ADMIN_ACTIVITY',
+                'icon': 'warning',
+                'activity_id': f'incident-{incident.id}',
+                'title': admin_title,
+                'subtitle': admin_subtitle,
+            },
+        )
+        return ok({'id': incident.incident_id, 'status': incident.status}, status.HTTP_201_CREATED)
 
 
 class HistoryView(APIView):

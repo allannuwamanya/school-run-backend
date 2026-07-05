@@ -32,6 +32,8 @@ urlpatterns = [
     path('stops/<uuid:pk>/pickup', views.StopPickupView.as_view(), name='api-stop-pickup'),
     path('stops/<uuid:pk>/dropoff', views.StopDropoffView.as_view(), name='api-stop-dropoff'),
     path('stops/<uuid:pk>/no-show', views.StopNoShowView.as_view(), name='api-stop-noshow'),
+    # Incidents (self-report — non-panic unhappy-path escalation)
+    path('incidents', views.IncidentReportView.as_view(), name='api-incidents'),
     # History
     path('history', views.HistoryView.as_view(), name='api-history'),
     # Notifications

@@ -13,11 +13,15 @@ class Incident(BaseModel):
     LATE_PICKUP = 'late_pickup'
     SICK_CHILD = 'sick_child'
     ROUTE_DEVIATION = 'route_deviation'
+    NO_SHOW = 'no_show'
+    OTHER = 'other'
     INCIDENT_TYPE_CHOICES = [
         (PANIC_ALERT, _('Panic Alert')),
         (LATE_PICKUP, _('Late Pickup')),
         (SICK_CHILD, _('Sick Child')),
         (ROUTE_DEVIATION, _('Route Deviation')),
+        (NO_SHOW, _('No Show')),
+        (OTHER, _('Other')),
     ]
 
     CRITICAL = 'critical'
@@ -67,6 +71,15 @@ class Incident(BaseModel):
 
     def __str__(self):
         return f"{self.incident_id} — {self.get_incident_type_display()} ({self.severity})"
+
+    @classmethod
+    def next_incident_id(cls):
+        """INC-001, INC-002, ... — shared so every creation path (admin
+        emergency dispatch, no-show auto-escalation, self-reports) numbers
+        incidents the same way instead of duplicating the parsing logic."""
+        last = cls.objects.order_by('-incident_id').values_list('incident_id', flat=True).first()
+        next_num = int(last.split('-')[-1]) + 1 if last and last.split('-')[-1].isdigit() else 1
+        return f"INC-{next_num:03d}"
 
     class Meta:
         verbose_name = 'Incident'

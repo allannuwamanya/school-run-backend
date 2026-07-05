@@ -125,3 +125,13 @@ This document keeps track of all completed components, database schemas, backgro
 * **[Added]** Unregistered device tokens are pruned automatically after a failed send.
 * **[Added]** Outgoing pushes carry a `WebpushFCMOptions` deep link (first HTTPS entry in `CORS_ALLOWED_ORIGINS`) so tapping a notification opens the PWA.
 * **[Added]** `notify()` helper centralizing "create `Notification` row + push it" — used by both the pickup/dropoff flow and the nightly manifest job, so the driver's "new pickup added" notification now pushes too (previously in-app only).
+
+---
+
+## 📅 Version 1.2.2 (Unhappy-Path Escalation — No-Show & Incident Self-Report)
+
+### 🚨 Incidents (`incidents`, `api`)
+* **[Fixed]** A no-show (`POST /stops/{id}/no-show`) previously only notified the parent — admin had no way to know a child wasn't collected unless they happened to be watching the dispatch screen. It now also auto-creates an `OPEN` `Incident` (new `NO_SHOW` type) with a timeline entry, and pushes it to admin the same way an admin-triggered emergency dispatch does.
+* **[Added]** `POST /incidents` — lets a driver or parent self-report a non-panic problem (sick child, blocked route, or other), scoped so a parent can only attach their own child and a driver only their own trip. Deliberately rejects `panic_alert` as a type so a self-report can't impersonate the (still Phase 3) panic flow.
+* **[Added]** `Incident.next_incident_id()` classmethod — centralizes `INC-NNN` numbering, previously duplicated inline in `AdminEmergencyDispatchView`.
+* **[Added]** `NO_SHOW` and `OTHER` incident types.
