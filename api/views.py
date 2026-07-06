@@ -513,6 +513,13 @@ def process_stop_event(request, stop_id, kind):
     if next_stop:
         next_stop.status = Stop.Status.NEXT
         next_stop.save()
+    elif not trip.stops.exclude(status__in=[Stop.Status.DROPPED, Stop.Status.NO_SHOW]).exists():
+        # Every stop is resolved and nothing about this route is a pending
+        # UI action — nothing else in the app ever calls TripCompleteView, so
+        # without this a trip sits at IN_PROGRESS forever and never shows up
+        # in the parent's trip history (which filters on status=COMPLETED).
+        trip.status = Trip.Status.COMPLETED
+        trip.save()
 
     result_data = {
         'stop': stop,
