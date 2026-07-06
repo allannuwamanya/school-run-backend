@@ -334,35 +334,34 @@ LIVE_PING_STALE_AFTER = timedelta(minutes=2)
 
 def _trip_current_point(trip):
     """The van's live position, from the driver's nav-screen location pings
-    (foreground-only — see DriverLocationPingView). Falls back to the
-    target/last stop's fixed coordinate if the driver hasn't pinged recently
-    (nav screen closed, trip not actually being driven yet, etc.)."""
-    driver = trip.driver
-    if (
-        driver.last_point
-        and driver.last_seen_at
-        and timezone.now() - driver.last_seen_at <= LIVE_PING_STALE_AFTER
-    ):
-        p = driver.last_point
-        return {"lat": float(p.y), "lng": float(p.x)}
+    (foreground-only — see DriverLocationPingView). Returns the driver's
+    last known GPS position regardless of staleness — a stale van position
+    is still *the van's* position. Never falls back to a stop's pickup
+    point (school/home address) since that makes it look like the van is
+    at a fixed location it hasn't reached yet.
 
-    next_stop = trip.stops.filter(status=Stop.Status.NEXT).select_related("child").first()
-    if next_stop and next_stop.child.pickup_point:
-        p = next_stop.child.pickup_point
-        return {"lat": float(p.y), "lng": float(p.x)}
-    last_stop = trip.stops.exclude(status=Stop.Status.UPCOMING).select_related("child").order_by("-sequence").first()
-    if last_stop and last_stop.child.pickup_point:
-        p = last_stop.child.pickup_point
-        return {"lat": float(p.y), "lng": float(p.x)}
+    Returns (point, stale) where stale is True when last_seen_at exceeds
+    LIVE_PING_STALE_AFTER, so the frontend can render the marker as faded
+    rather than misleadingly showing a non-van coordinate."""
+    driver = trip.driver
+    if driver.last_point:
+        p = driver.last_point
+        stale = not (driver.last_seen_at and timezone.now() - driver.last_seen_at <= LIVE_PING_STALE_AFTER)
+        return {"lat": float(p.y), "lng": float(p.x), "stale": stale}
     return None
 
 
 def serialize_fleet_van(trip):
+    point = _trip_current_point(trip)
+    position_stale = point["stale"] if point else None
+    if point:
+        del point["stale"]
     return {
         "id": str(trip.id),
         "driver_name": trip.driver.user.full_name,
         "driver_phone": trip.driver.user.phone,
         "plate": trip.driver.plate,
         "status": _trip_fleet_status(trip),
-        "point": _trip_current_point(trip),
+        "point": point,
+        "position_stale": position_stale,
     }
