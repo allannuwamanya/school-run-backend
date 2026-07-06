@@ -93,4 +93,11 @@ urlpatterns = [
         name='admin-incidents-resolve',
     ),
     path('admin/analytics', admin_views.AdminAnalyticsView.as_view(), name='admin-analytics'),
+    path('admin/users', admin_views.AdminUserListView.as_view(), name='admin-users'),
+    path(
+        'admin/users/<int:pk>/set-password',
+        admin_views.AdminUserSetPasswordView.as_view(),
+        name='admin-user-set-password',
+    ),
+    path('admin/users/<int:pk>', admin_views.AdminUserDeleteView.as_view(), name='admin-user-delete'),
 ]

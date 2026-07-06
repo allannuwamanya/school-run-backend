@@ -176,6 +176,19 @@ def serialize_parent_detail(parent):
     }
 
 
+def serialize_user_row(user):
+    profile = getattr(user, "parent", None) or getattr(user, "driver", None)
+    return {
+        "id": str(user.id),
+        "full_name": user.full_name or user.phone,
+        "phone": user.phone,
+        "role": user.role,
+        "is_active": user.is_active,
+        "zone": _zone_name(profile) if profile else "Unassigned",
+        "joined": profile.created_at.date().isoformat() if profile else None,
+    }
+
+
 TXN_TYPE_MAP = {
     Transaction.MONTHLY_SUB: "MONTHLY_SUB",
     Transaction.EMERGENCY: "EMERGENCY",

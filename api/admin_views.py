@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.core.paginator import Paginator
 from django.db.models import Avg, Sum
+from django.db.models.deletion import ProtectedError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.response import Response
@@ -28,8 +29,11 @@ from .admin_serializers import (
     serialize_parent_row,
     serialize_route,
     serialize_transaction,
+    serialize_user_row,
     serialize_zone,
 )
+
+MANAGEABLE_ROLES = [CustomUser.Role.PARENT, CustomUser.Role.DRIVER]
 
 PARENT_PAGE_SIZE = 20
 
@@ -738,3 +742,56 @@ class AdminAnalyticsView(APIView):
                 ).count(),
             }
         )
+
+
+class AdminUserListView(APIView):
+    """Account management for parent/driver logins: view, set password,
+    delete. Distinct from AdminParentListView/AdminDriverListView, which
+    manage the business-facing profile (subscriptions, docs, assignment)
+    rather than the underlying login credentials."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        users = CustomUser.objects.filter(role__in=MANAGEABLE_ROLES).select_related(
+            "parent__zone", "driver__zone"
+        ).order_by("-id")
+        rows = [serialize_user_row(u) for u in users]
+
+        role_filter = (request.query_params.get("role") or "").strip().upper()
+        if role_filter in MANAGEABLE_ROLES:
+            rows = [r for r in rows if r["role"] == role_filter]
+
+        q = (request.query_params.get("q") or "").strip().lower()
+        if q:
+            rows = [r for r in rows if q in r["full_name"].lower() or q in (r["phone"] or "").lower()]
+
+        return ok({"count": len(rows), "results": rows})
+
+
+class AdminUserSetPasswordView(APIView):
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        user = get_object_or_404(CustomUser, pk=pk, role__in=MANAGEABLE_ROLES)
+        password = (request.data.get("password") or "").strip()
+        if len(password) < 6:
+            return err("Password must be at least 6 characters.", 400)
+        user.set_password(password)
+        user.save(update_fields=["password"])
+        return ok({"id": str(user.id)})
+
+
+class AdminUserDeleteView(APIView):
+    permission_classes = [IsAdmin]
+
+    def delete(self, request, pk):
+        user = get_object_or_404(CustomUser, pk=pk, role__in=MANAGEABLE_ROLES)
+        try:
+            user.delete()
+        except ProtectedError:
+            return err(
+                "Can't delete this driver — they have trips or assignments on record. "
+                "Reassign or clear those first.",
+                409,
+            )
+        return ok(None, 204)
