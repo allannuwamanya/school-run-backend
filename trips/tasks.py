@@ -212,6 +212,14 @@ def sync_trip_for_schedule(child: Child) -> None:
         trip = _ensure_trip(driver, today, direction)
         if _append_stop_if_missing(trip, child, direction):
             added = True
+            # The trip may have already finished its other stops and been
+            # marked COMPLETED before this one was added — it has a pending
+            # stop again now, so it isn't really done. Without this it stays
+            # COMPLETED and never shows up as active on the admin dispatch
+            # map once the driver acts on the new stop.
+            if trip.status == Trip.Status.COMPLETED:
+                trip.status = Trip.Status.IN_PROGRESS
+                trip.save(update_fields=["status"])
 
     if added:
         notify(

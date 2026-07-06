@@ -479,7 +479,12 @@ def process_stop_event(request, stop_id, kind):
                 notif_kind = Notification.Kind.DROPOFF
                 notif_title = f'{stop.child.full_name} dropped off'
                 notif_body = f'{stop.child.full_name} was dropped at home by {request.user.full_name}.'
-        if trip.status == Trip.Status.SCHEDULED:
+        # COMPLETED is included alongside SCHEDULED because a trip can be
+        # reopened by a stop added after it finished (see
+        # sync_trip_for_schedule) — without this, a pickup/dropoff on that
+        # late stop leaves the trip stuck at COMPLETED and it silently drops
+        # off the admin dispatch view, which only shows IN_PROGRESS trips.
+        if trip.status in (Trip.Status.SCHEDULED, Trip.Status.COMPLETED):
             trip.status = Trip.Status.IN_PROGRESS
             trip.save()
         stop.save()
