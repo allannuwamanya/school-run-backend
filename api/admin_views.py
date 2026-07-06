@@ -789,9 +789,15 @@ class AdminUserDeleteView(APIView):
         try:
             user.delete()
         except ProtectedError:
-            return err(
-                "Can't delete this driver — they have trips or assignments on record. "
-                "Reassign or clear those first.",
-                409,
-            )
+            if user.role == CustomUser.Role.DRIVER:
+                detail = (
+                    "Can't delete this driver — they have trips or assignments on record. "
+                    "Reassign or clear those first."
+                )
+            else:
+                detail = (
+                    "Can't delete this parent — their children have pickup/dropoff history on "
+                    "record, which can't be removed. Deactivate the account instead."
+                )
+            return err(detail, 409)
         return ok(None, 204)
