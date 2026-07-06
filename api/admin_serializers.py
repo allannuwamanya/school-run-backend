@@ -336,26 +336,48 @@ def _trip_current_point(trip):
     """The van's live position, from the driver's nav-screen location pings
     (foreground-only — see DriverLocationPingView). Returns the driver's
     last known GPS position regardless of staleness — a stale van position
-    is still *the van's* position. Never falls back to a stop's pickup
-    point (school/home address) since that makes it look like the van is
-    at a fixed location it hasn't reached yet.
+    is still *the van's* position.
+    
+    If no live GPS ping exists, falls back to the current/next stop's location
+    as an approximation (marked with approximate=True), so the dispatch map
+    still shows *something* useful even when the driver hasn't opened the nav
+    screen yet or location services are off.
 
-    Returns (point, stale) where stale is True when last_seen_at exceeds
-    LIVE_PING_STALE_AFTER, so the frontend can render the marker as faded
-    rather than misleadingly showing a non-van coordinate."""
+    Returns (point, stale, approximate) where:
+    - stale: True when last_seen_at exceeds LIVE_PING_STALE_AFTER
+    - approximate: True when using stop location fallback (no live GPS)"""
     driver = trip.driver
+    
+    # First try: use actual driver GPS ping
     if driver.last_point:
         p = driver.last_point
         stale = not (driver.last_seen_at and timezone.now() - driver.last_seen_at <= LIVE_PING_STALE_AFTER)
-        return {"lat": float(p.y), "lng": float(p.x), "stale": stale}
+        return {"lat": float(p.y), "lng": float(p.x), "stale": stale, "approximate": False}
+    
+    # Fallback: use next stop's location as approximate position
+    next_stop = trip.stops.filter(
+        status__in=[Stop.Status.NEXT, Stop.Status.UPCOMING]
+    ).order_by("sequence").first()
+    
+    if next_stop:
+        # Use pickup point for the next stop
+        point = next_stop.child.pickup_point
+        if point:
+            return {"lat": float(point.y), "lng": float(point.x), "stale": True, "approximate": True}
+    
     return None
 
 
 def serialize_fleet_van(trip):
-    point = _trip_current_point(trip)
-    position_stale = point["stale"] if point else None
-    if point:
-        del point["stale"]
+    point_data = _trip_current_point(trip)
+    position_stale = point_data["stale"] if point_data else None
+    position_approximate = point_data["approximate"] if point_data else None
+    
+    # Extract just lat/lng for the point field
+    point = None
+    if point_data:
+        point = {"lat": point_data["lat"], "lng": point_data["lng"]}
+    
     return {
         "id": str(trip.id),
         "driver_name": trip.driver.user.full_name,
@@ -364,4 +386,5 @@ def serialize_fleet_van(trip):
         "status": _trip_fleet_status(trip),
         "point": point,
         "position_stale": position_stale,
+        "position_approximate": position_approximate,
     }
