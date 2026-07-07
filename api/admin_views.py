@@ -4,6 +4,8 @@ from django.core.paginator import Paginator
 from django.db.models import Avg, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.dateparse import parse_date
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -202,14 +204,33 @@ class AdminDriverListView(APIView):
         if zone_name and zone_name.lower() != "unassigned":
             zone = Zone.objects.filter(name__iexact=zone_name).first()
 
+        if not phone:
+            return err("phone is required.", 400)
         if CustomUser.objects.filter(phone=phone).exists():
             return err("A user with this phone already exists.", 409)
 
+        password = (body.get("password") or "").strip()
+        if len(password) < 6:
+            return err("Password must be at least 6 characters.", 400)
+
+        gender = (body.get("gender") or "").strip().upper()
+        if gender not in CustomUser.Gender.values:
+            gender = ""
+        date_of_birth = parse_date((body.get("date_of_birth") or "").strip())
+
+        seats_raw = body.get("seats")
+        try:
+            seats = int(seats_raw) if seats_raw else 14
+        except ValueError:
+            seats = 14
+
         user = CustomUser.objects.create_user(
             phone=phone,
-            password="password",
+            password=password,
             full_name=body.get("full_name", ""),
             role=CustomUser.Role.DRIVER,
+            date_of_birth=date_of_birth,
+            gender=gender,
             push_notifications_enabled=True,
         )
         driver = Driver.objects.create(
@@ -217,10 +238,12 @@ class AdminDriverListView(APIView):
             vehicle_make=make,
             vehicle_model=model,
             plate=body.get("plate", ""),
+            color=body.get("color", ""),
+            seats=seats,
             zone=zone,
             driver_since=timezone.now().date(),
         )
-        return ok(serialize_driver_detail(driver), 201)
+        return ok(serialize_driver_detail(driver, request), 201)
 
 
 class AdminDriverDetailView(APIView):
@@ -228,7 +251,7 @@ class AdminDriverDetailView(APIView):
 
     def get(self, request, pk):
         driver = get_object_or_404(Driver.objects.select_related("user", "zone"), pk=pk)
-        return ok(serialize_driver_detail(driver))
+        return ok(serialize_driver_detail(driver, request))
 
 
 class AdminDriverApproveView(APIView):
@@ -238,7 +261,7 @@ class AdminDriverApproveView(APIView):
         driver = get_object_or_404(Driver, pk=pk)
         driver.is_verified = True
         driver.save()
-        return ok(serialize_driver_detail(driver))
+        return ok(serialize_driver_detail(driver, request))
 
 
 class AdminDriverRejectView(APIView):
@@ -260,7 +283,52 @@ class AdminDriverRequestDocsView(APIView):
         for doc_type in REQUIRED_DOC_TYPES:
             if doc_type not in existing:
                 VerificationDocument.objects.create(driver=driver, doc_type=doc_type, status=VerificationDocument.Status.PENDING)
-        return ok(serialize_driver_detail(driver))
+        return ok(serialize_driver_detail(driver, request))
+
+
+class AdminDriverDocumentUploadView(APIView):
+    permission_classes = [IsAdmin]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, pk):
+        driver = get_object_or_404(Driver, pk=pk)
+        doc_type = (request.data.get("doc_type") or "").strip().upper()
+        if doc_type not in VerificationDocument.DocType.values:
+            return err("Invalid document type.", 400)
+        file = request.FILES.get("file")
+        if not file:
+            return err("A file is required.", 400)
+
+        VerificationDocument.objects.update_or_create(
+            driver=driver,
+            doc_type=doc_type,
+            defaults={
+                "file": file,
+                "status": VerificationDocument.Status.VERIFIED,
+                "verified_at": timezone.now(),
+            },
+        )
+        return ok(serialize_driver_detail(driver, request), 201)
+
+
+class AdminDriverVerifyNinView(APIView):
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        driver = get_object_or_404(Driver.objects.select_related("user"), pk=pk)
+        driver.user.nin_verified = True
+        driver.user.save(update_fields=["nin_verified"])
+        return ok(serialize_driver_detail(driver, request))
+
+
+class AdminDriverRejectNinView(APIView):
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        driver = get_object_or_404(Driver.objects.select_related("user"), pk=pk)
+        driver.user.nin_verified = False
+        driver.user.save(update_fields=["nin_verified"])
+        return ok(serialize_driver_detail(driver, request))
 
 
 class AdminParentListView(APIView):

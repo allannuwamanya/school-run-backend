@@ -59,6 +59,11 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         DRIVER = "DRIVER", "Driver"
         ADMIN = "ADMIN", "Admin"
 
+    class Gender(models.TextChoices):
+        FEMALE = "F", "Female"
+        MALE = "M", "Male"
+        OTHER = "O", "Other"
+
     username = None
     first_name = None
     last_name = None
@@ -69,7 +74,9 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(max_length=200, null=True, blank=True)
     full_name = models.CharField(max_length=120, blank=True)
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.PARENT)
-    
+    date_of_birth = models.DateField(null=True, blank=True)
+    gender = models.CharField(max_length=1, choices=Gender.choices, blank=True)
+
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
@@ -150,6 +157,7 @@ class VerificationDocument(Base):
         LICENSE = "LICENSE", "Driver's licence"
         INSPECTION = "INSPECTION", "Vehicle inspection report"
         BACKGROUND = "BACKGROUND", "Criminal background check"
+        INSURANCE = "INSURANCE", "Vehicle insurance"
 
     class Status(models.TextChoices):
         PENDING = "PENDING", "Pending"

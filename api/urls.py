@@ -53,6 +53,21 @@ urlpatterns = [
         admin_views.AdminDriverRequestDocsView.as_view(),
         name='admin-driver-request-docs',
     ),
+    path(
+        'admin/drivers/<uuid:pk>/documents',
+        admin_views.AdminDriverDocumentUploadView.as_view(),
+        name='admin-driver-document-upload',
+    ),
+    path(
+        'admin/drivers/<uuid:pk>/verify-nin',
+        admin_views.AdminDriverVerifyNinView.as_view(),
+        name='admin-driver-verify-nin',
+    ),
+    path(
+        'admin/drivers/<uuid:pk>/reject-nin',
+        admin_views.AdminDriverRejectNinView.as_view(),
+        name='admin-driver-reject-nin',
+    ),
     path('admin/parents', admin_views.AdminParentListView.as_view(), name='admin-parents'),
     path('admin/parents/<uuid:pk>', admin_views.AdminParentDetailView.as_view(), name='admin-parent-detail'),
     path('admin/parents/<uuid:pk>/suspend', admin_views.AdminParentSuspendView.as_view(), name='admin-parent-suspend'),

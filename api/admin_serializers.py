@@ -21,11 +21,13 @@ REQUIRED_DOC_TYPES = [
     VerificationDocument.DocType.LICENSE,
     VerificationDocument.DocType.INSPECTION,
     VerificationDocument.DocType.BACKGROUND,
+    VerificationDocument.DocType.INSURANCE,
 ]
 DOC_LABEL = {
     VerificationDocument.DocType.LICENSE: "License",
     VerificationDocument.DocType.INSPECTION: "Inspection",
     VerificationDocument.DocType.BACKGROUND: "Background Check",
+    VerificationDocument.DocType.INSURANCE: "Insurance",
 }
 
 
@@ -82,23 +84,34 @@ def serialize_driver_list_item(driver):
         "days_pending": 0 if driver.is_verified else (timezone.now() - driver.created_at).days,
         "is_ready": driver.is_verified,
         "docs_missing": _docs_missing(driver),
+        "nin_verified": driver.user.nin_verified,
     }
 
 
-def serialize_driver_detail(driver):
+def _doc_url(doc, request=None):
+    if not doc.file:
+        return None
+    return request.build_absolute_uri(doc.file.url) if request is not None else doc.file.url
+
+
+def serialize_driver_detail(driver, request=None):
     docs = _doc_map(driver)
     checklist = []
     for doc_type in REQUIRED_DOC_TYPES:
         doc = docs.get(doc_type)
         if doc is None:
             status = "MISSING"
+            url = None
         elif doc.status in (VerificationDocument.Status.VERIFIED, VerificationDocument.Status.CLEAR):
             status = "VERIFIED"
+            url = _doc_url(doc, request)
         elif doc.status == VerificationDocument.Status.PENDING:
             status = "PENDING"
+            url = _doc_url(doc, request)
         else:
             status = "REVIEW"
-        checklist.append({"label": DOC_LABEL[doc_type], "status": status})
+            url = _doc_url(doc, request)
+        checklist.append({"label": DOC_LABEL[doc_type], "status": status, "url": url})
 
     experience_years = 0
     if driver.driver_since:
