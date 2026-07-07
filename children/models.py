@@ -23,7 +23,6 @@ class Child(Base):
     class Gender(models.TextChoices):
         FEMALE = "F", "Female"
         MALE = "M", "Male"
-        OTHER = "O", "Other"
 
     parent = models.ForeignKey(
         Parent, on_delete=models.CASCADE, related_name="children"

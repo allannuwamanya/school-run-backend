@@ -62,7 +62,6 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     class Gender(models.TextChoices):
         FEMALE = "F", "Female"
         MALE = "M", "Male"
-        OTHER = "O", "Other"
 
     username = None
     first_name = None
