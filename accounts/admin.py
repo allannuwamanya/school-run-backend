@@ -19,3 +19,23 @@ class UserModelAdmin(ImportExportModelAdmin):
 
 admin.site.register(user,UserModelAdmin)
 admin.site.register(models.ErrorLog)
+
+
+@admin.register(models.AccountDeletionLog)
+class AccountDeletionLogAdmin(admin.ModelAdmin):
+    """View-only — deleted accounts' audit trail. No add/change/delete
+    permission is granted here; models.AccountDeletionLog also blocks
+    delete() itself, so this can't be cleared out via the admin UI either."""
+    list_display = ("deleted_at", "target_full_name", "target_phone", "target_role", "deleted_by_name")
+    list_filter = ("target_role",)
+    search_fields = ("target_full_name", "target_phone", "deleted_by_name")
+    ordering = ("-deleted_at",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

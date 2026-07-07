@@ -2,13 +2,12 @@ from datetime import timedelta
 
 from django.core.paginator import Paginator
 from django.db.models import Avg, Sum
-from django.db.models.deletion import ProtectedError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import CustomUser, Driver, Notification, Parent, VerificationDocument
+from accounts.models import AccountDeletionLog, CustomUser, Driver, Notification, Parent, VerificationDocument
 from children.models import Child
 from incidents.models import Incident, IncidentTimeline
 from main.firebase_push import notify, notify_admins
@@ -786,18 +785,26 @@ class AdminUserDeleteView(APIView):
 
     def delete(self, request, pk):
         user = get_object_or_404(CustomUser, pk=pk, role__in=MANAGEABLE_ROLES)
-        try:
-            user.delete()
-        except ProtectedError:
-            if user.role == CustomUser.Role.DRIVER:
-                detail = (
-                    "Can't delete this driver — they have trips or assignments on record. "
-                    "Reassign or clear those first."
-                )
-            else:
-                detail = (
-                    "Can't delete this parent — their children have pickup/dropoff history on "
-                    "record, which can't be removed. Deactivate the account instead."
-                )
-            return err(detail, 409)
+
+        # Snapshot everything worth logging before delete() clears user.pk
+        # and cascades away the children/trips themselves.
+        target_user_id = user.id
+        target_role = user.role
+        target_full_name = user.full_name or user.phone
+        target_phone = user.phone or ""
+        children_deleted = Child.objects.filter(parent__user=user).count()
+        trips_deleted = Trip.objects.filter(driver__user=user).count()
+
+        user.delete()
+
+        AccountDeletionLog.objects.create(
+            deleted_by=request.user,
+            deleted_by_name=request.user.full_name or request.user.phone,
+            target_user_id=target_user_id,
+            target_role=target_role,
+            target_full_name=target_full_name,
+            target_phone=target_phone,
+            children_deleted=children_deleted,
+            trips_deleted=trips_deleted,
+        )
         return ok(None, 204)

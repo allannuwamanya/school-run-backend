@@ -2,6 +2,7 @@ import uuid
 from django.conf import settings
 from django.contrib.auth.base_user import BaseUserManager, AbstractBaseUser
 from django.contrib.auth.models import PermissionsMixin
+from django.core.exceptions import PermissionDenied
 from django.db import models
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -175,6 +176,44 @@ class VerificationDocument(Base):
 
     def __str__(self):
         return f"{self.get_doc_type_display()} — {self.driver}"
+
+
+class UndeletableQuerySet(models.QuerySet):
+    def delete(self):
+        raise PermissionDenied("Account deletion logs cannot be deleted.")
+
+
+class AccountDeletionLog(models.Model):
+    """Permanent record of an admin deleting a parent/driver login. A
+    snapshot, not a live FK to the deleted account — that account (and,
+    since the delete cascades, its children/trips) won't exist to look up
+    afterward. `delete()` is blocked at both the instance and queryset
+    level so this stays a real audit trail rather than something that can
+    be quietly cleaned up alongside the account it describes."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    deleted_at = models.DateTimeField(auto_now_add=True)
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+        related_name="account_deletions_performed",
+    )
+    deleted_by_name = models.CharField(max_length=120, blank=True)
+    target_user_id = models.BigIntegerField()
+    target_role = models.CharField(max_length=10)
+    target_full_name = models.CharField(max_length=120, blank=True)
+    target_phone = models.CharField(max_length=20, blank=True)
+    children_deleted = models.PositiveIntegerField(default=0)
+    trips_deleted = models.PositiveIntegerField(default=0)
+
+    objects = UndeletableQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-deleted_at"]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionDenied("Account deletion logs cannot be deleted.")
+
+    def __str__(self):
+        return f"{self.target_full_name or self.target_phone} deleted by {self.deleted_by_name or 'unknown'} at {self.deleted_at}"
 
 
 class ErrorLog(models.Model):

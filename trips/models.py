@@ -11,7 +11,7 @@ from children.models import Child
 # ---------------------------------------------------------------------------
 class Assignment(Base):
     driver = models.ForeignKey(
-        Driver, on_delete=models.PROTECT, related_name="assignments"
+        Driver, on_delete=models.CASCADE, related_name="assignments"
     )
     parent = models.ForeignKey(
         Parent, on_delete=models.CASCADE, related_name="assignments"
@@ -47,7 +47,7 @@ class Trip(Base):
         CANCELLED = "CANCELLED", "Cancelled"
 
     driver = models.ForeignKey(
-        Driver, on_delete=models.PROTECT, related_name="trips"
+        Driver, on_delete=models.CASCADE, related_name="trips"
     )
     service_date = models.DateField()
     direction = models.CharField(max_length=9, choices=Direction.choices)
@@ -82,7 +82,7 @@ class Stop(Base):
         NO_SHOW = "NO_SHOW", "No show"
 
     trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name="stops")
-    child = models.ForeignKey(Child, on_delete=models.PROTECT, related_name="stops")
+    child = models.ForeignKey(Child, on_delete=models.CASCADE, related_name="stops")
     sequence = models.PositiveSmallIntegerField()
     status = models.CharField(
         max_length=9, choices=Status.choices, default=Status.UPCOMING
