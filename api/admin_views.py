@@ -5,6 +5,7 @@ from django.db.models import Avg, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.utils.text import slugify
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -45,6 +46,19 @@ def ok(data, status_code=200):
 
 def err(detail, status_code=400):
     return Response({"detail": detail}, status=status_code)
+
+
+def _resolve_zone(zone_name):
+    """Look up a zone by name, creating it if the admin typed one that
+    doesn't exist yet — zones aren't a closed list, so onboarding
+    shouldn't be blocked on a zone having been pre-seeded."""
+    zone_name = (zone_name or "").strip()
+    if not zone_name or zone_name.lower() == "unassigned":
+        return None
+    zone = Zone.objects.filter(name__iexact=zone_name).first()
+    if zone:
+        return zone
+    return Zone.objects.create(name=zone_name, slug=slugify(zone_name), is_active=True)
 
 
 class AdminOverviewView(APIView):
@@ -191,10 +205,7 @@ class AdminDriverListView(APIView):
         phone = (body.get("phone") or "").replace(" ", "")
         vehicle = (body.get("vehicle") or "").strip()
         make, _, model = vehicle.partition(" ")
-        zone = None
-        zone_name = (body.get("zone") or "").strip()
-        if zone_name and zone_name.lower() != "unassigned":
-            zone = Zone.objects.filter(name__iexact=zone_name).first()
+        zone = _resolve_zone(body.get("zone"))
 
         if not phone:
             return err("phone is required.", 400)
@@ -397,10 +408,7 @@ class AdminParentListView(APIView):
         if CustomUser.objects.filter(phone=phone).exists():
             return err("A user with this phone already exists.", 409)
 
-        zone = None
-        zone_name = (body.get("zone") or "").strip()
-        if zone_name and zone_name.lower() != "unassigned":
-            zone = Zone.objects.filter(name__iexact=zone_name).first()
+        zone = _resolve_zone(body.get("zone"))
 
         user = CustomUser.objects.create_user(
             phone=phone,
