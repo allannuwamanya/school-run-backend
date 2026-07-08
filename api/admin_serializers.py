@@ -20,13 +20,11 @@ from trips.models import Assignment, Stop
 REQUIRED_DOC_TYPES = [
     VerificationDocument.DocType.LICENSE,
     VerificationDocument.DocType.INSPECTION,
-    VerificationDocument.DocType.BACKGROUND,
     VerificationDocument.DocType.INSURANCE,
 ]
 DOC_LABEL = {
     VerificationDocument.DocType.LICENSE: "License",
     VerificationDocument.DocType.INSPECTION: "Inspection",
-    VerificationDocument.DocType.BACKGROUND: "Background Check",
     VerificationDocument.DocType.INSURANCE: "Insurance",
 }
 
@@ -56,17 +54,6 @@ def _driver_documents(driver):
     return out
 
 
-def _bgc_status(driver):
-    doc = _doc_map(driver).get(VerificationDocument.DocType.BACKGROUND)
-    if doc is None:
-        return "NOT_STARTED"
-    if doc.status in (VerificationDocument.Status.VERIFIED, VerificationDocument.Status.CLEAR):
-        return "CLEARED"
-    if doc.status == VerificationDocument.Status.PENDING:
-        return "PENDING"
-    return "PENDING"  # REJECTED — treated as still needing action
-
-
 def _docs_missing(driver):
     docs = _doc_map(driver)
     return sum(1 for t in REQUIRED_DOC_TYPES if t not in docs)
@@ -80,7 +67,6 @@ def serialize_driver_list_item(driver):
         "zone": _zone_name(driver),
         "vehicle": f"{driver.vehicle_make} {driver.vehicle_model}".strip(),
         "documents": _driver_documents(driver),
-        "bgc_status": _bgc_status(driver),
         "days_pending": 0 if driver.is_verified else (timezone.now() - driver.created_at).days,
         "is_ready": driver.is_verified,
         "docs_missing": _docs_missing(driver),

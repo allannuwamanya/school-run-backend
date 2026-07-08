@@ -70,7 +70,6 @@ class AdminOverviewView(APIView):
                     "documents": [
                         {"label": "License", "ok": d.documents.filter(doc_type=VerificationDocument.DocType.LICENSE).exists()},
                         {"label": "Inspection", "ok": d.documents.filter(doc_type=VerificationDocument.DocType.INSPECTION).exists()},
-                        {"label": "Background Check", "ok": d.documents.filter(doc_type=VerificationDocument.DocType.BACKGROUND).exists()},
                     ],
                 }
             )
@@ -173,12 +172,6 @@ class AdminDriverListView(APIView):
 
     def get(self, request):
         drivers = Driver.objects.select_related("user", "zone").prefetch_related("documents").order_by("-created_at")
-        bgc_in_progress = sum(
-            1 for d in drivers if d.documents.filter(
-                doc_type=VerificationDocument.DocType.BACKGROUND,
-                status=VerificationDocument.Status.PENDING,
-            ).exists()
-        )
         rejected = VerificationDocument.objects.filter(status=VerificationDocument.Status.REJECTED).values(
             "driver"
         ).distinct().count()
@@ -186,7 +179,6 @@ class AdminDriverListView(APIView):
             {
                 "stats": {
                     "awaiting_review": drivers.filter(is_verified=False).count(),
-                    "bgc_in_progress": bgc_in_progress,
                     "approved_drivers": drivers.filter(is_verified=True).count(),
                     "rejected_all_time": rejected,
                 },
