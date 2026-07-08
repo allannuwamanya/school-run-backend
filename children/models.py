@@ -24,6 +24,10 @@ class Child(Base):
         FEMALE = "F", "Female"
         MALE = "M", "Male"
 
+    class TransportMode(models.TextChoices):
+        ELECTRIC_CAR = "ELECTRIC_CAR", "Electric Car"
+        BODA_BODA = "BODA_BODA", "Boda Boda"
+
     parent = models.ForeignKey(
         Parent, on_delete=models.CASCADE, related_name="children"
     )
@@ -37,6 +41,7 @@ class Child(Base):
     blood_type = models.CharField(max_length=3, blank=True)      # e.g. "O+"
     class_name = models.CharField(max_length=40, blank=True)     # e.g. "Grade 3"
     allergies = models.CharField(max_length=255, blank=True)     # e.g. "Peanut allergy"
+    transport_mode = models.CharField(max_length=20, choices=TransportMode.choices, blank=True)
     photo = models.ImageField(upload_to="children/", null=True, blank=True)
 
     pickup_address = models.CharField(max_length=255)

@@ -153,8 +153,8 @@ class ChildListSerializer(serializers.ModelSerializer):
         model = Child
         fields = [
             'id', 'full_name', 'date_of_birth', 'gender', 'blood_type',
-            'class_name', 'allergies', 'photo', 'school', 'pickup_address',
-            'pickup_point', 'is_active', 'schedule',
+            'class_name', 'allergies', 'transport_mode', 'photo', 'school',
+            'pickup_address', 'pickup_point', 'is_active', 'schedule',
         ]
 
     def get_schedule(self, obj):
@@ -178,12 +178,13 @@ class ChildCreateSerializer(serializers.ModelSerializer):
     blood_type = serializers.CharField(required=False, allow_blank=True)
     class_name = serializers.CharField(required=False, allow_blank=True)
     allergies = serializers.CharField(required=False, allow_blank=True)
+    transport_mode = serializers.ChoiceField(choices=Child.TransportMode.choices, required=False, allow_blank=True)
 
     class Meta:
         model = Child
         fields = [
             'full_name', 'date_of_birth', 'gender', 'blood_type', 'class_name',
-            'allergies', 'school_id', 'pickup_address', 'pickup_point',
+            'allergies', 'transport_mode', 'school_id', 'pickup_address', 'pickup_point',
         ]
 
     def create(self, validated_data):
