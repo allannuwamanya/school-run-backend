@@ -81,6 +81,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     # preferences & verification from contract
     nin_verified = models.BooleanField(default=False)
+    nin_number = models.CharField(max_length=20, blank=True)
     push_notifications_enabled = models.BooleanField(default=True)
     location_sharing_enabled = models.BooleanField(default=True)
     dark_mode = models.BooleanField(default=False)
@@ -157,6 +158,8 @@ class VerificationDocument(Base):
         INSPECTION = "INSPECTION", "Vehicle inspection report"
         BACKGROUND = "BACKGROUND", "Criminal background check"
         INSURANCE = "INSURANCE", "Vehicle insurance"
+        NIN_FRONT = "NIN_FRONT", "National ID (front)"
+        NIN_BACK = "NIN_BACK", "National ID (back)"
 
     class Status(models.TextChoices):
         PENDING = "PENDING", "Pending"

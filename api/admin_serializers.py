@@ -117,12 +117,18 @@ def serialize_driver_detail(driver, request=None):
     if driver.driver_since:
         experience_years = max(0, (timezone.now().date() - driver.driver_since).days // 365)
 
+    nin_front = docs.get(VerificationDocument.DocType.NIN_FRONT)
+    nin_back = docs.get(VerificationDocument.DocType.NIN_BACK)
+
     return {
         **serialize_driver_list_item(driver),
         "experience_years": experience_years,
         "plate": driver.plate,
         "applied": driver.created_at.date().isoformat(),
         "checklist": checklist,
+        "nin_number": driver.user.nin_number,
+        "nin_front_url": _doc_url(nin_front, request) if nin_front else None,
+        "nin_back_url": _doc_url(nin_back, request) if nin_back else None,
     }
 
 

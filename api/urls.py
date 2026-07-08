@@ -59,6 +59,11 @@ urlpatterns = [
         name='admin-driver-document-upload',
     ),
     path(
+        'admin/drivers/<uuid:pk>/nin-number',
+        admin_views.AdminDriverUpdateNinNumberView.as_view(),
+        name='admin-driver-nin-number',
+    ),
+    path(
         'admin/drivers/<uuid:pk>/verify-nin',
         admin_views.AdminDriverVerifyNinView.as_view(),
         name='admin-driver-verify-nin',

@@ -311,6 +311,19 @@ class AdminDriverDocumentUploadView(APIView):
         return ok(serialize_driver_detail(driver, request), 201)
 
 
+class AdminDriverUpdateNinNumberView(APIView):
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        driver = get_object_or_404(Driver.objects.select_related("user"), pk=pk)
+        nin_number = (request.data.get("nin_number") or "").strip()
+        if not nin_number:
+            return err("NIN number is required.", 400)
+        driver.user.nin_number = nin_number
+        driver.user.save(update_fields=["nin_number"])
+        return ok(serialize_driver_detail(driver, request))
+
+
 class AdminDriverVerifyNinView(APIView):
     permission_classes = [IsAdmin]
 
