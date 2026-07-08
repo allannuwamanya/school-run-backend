@@ -126,7 +126,7 @@ class AdminOverviewView(APIView):
                     "id": f"txn-{t.id}",
                     "icon": "payment",
                     "title": f"Payment received — {t.parent.user.full_name or t.parent.user.phone}",
-                    "subtitle": f"₦{t.amount}",
+                    "subtitle": f"UGX {t.amount}",
                     "_at": t.processed_at,
                 }
             )

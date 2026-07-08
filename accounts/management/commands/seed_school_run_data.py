@@ -11,13 +11,13 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         # 1. Seed Zones
         zones_data = [
-            {"name": "Lekki", "description": "Lekki Phase 1, Phase 2, and environs"},
-            {"name": "Ajah", "description": "Ajah, Badore, Sangotedo, and environs"},
-            {"name": "Ikeja", "description": "Ikeja, Allen Avenue, GRA, and environs"},
-            {"name": "Victoria Island", "description": "Victoria Island, Oniru, and environs"},
-            {"name": "Surulere", "description": "Surulere, Adeniran Ogunsanya, and environs"},
-            {"name": "Yaba", "description": "Yaba, Ebute Metta, Sabo, and environs"},
-            {"name": "Gbagada", "description": "Gbagada Phase 1, Phase 2, and environs"},
+            {"name": "Ntinda", "description": "Ntinda, Naalya Road, and environs"},
+            {"name": "Kansanga", "description": "Kansanga, Muyenga, and environs"},
+            {"name": "Naalya", "description": "Naalya, Kyaliwajjala, and environs"},
+            {"name": "Kololo", "description": "Kololo, Nakasero, and environs"},
+            {"name": "Bugolobi", "description": "Bugolobi, Luzira, and environs"},
+            {"name": "Kira", "description": "Kira, Bweyogerere, and environs"},
+            {"name": "Muyenga", "description": "Muyenga, Kabalagala, and environs"},
         ]
 
         self.stdout.write("Seeding Zones...")
@@ -91,7 +91,7 @@ class Command(BaseCommand):
                 report_type=report_info["report_type"],
                 defaults={
                     "frequency": report_info["frequency"],
-                    "recipients": ["admin@schoolrun.ng"],
+                    "recipients": ["admin@schoolrun.ug"],
                     "is_active": True
                 }
             )

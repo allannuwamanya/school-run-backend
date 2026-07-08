@@ -4,7 +4,7 @@ from accounts.models import BaseModel
 
 class Zone(BaseModel):
     """
-    Geographic service area (e.g. Lekki, Ajah, Victoria Island).
+    Geographic service area (e.g. Ntinda, Kansanga, Kololo).
     Drivers and parent pick-up locations are assigned to a zone.
     """
     name = models.CharField(max_length=100, unique=True)

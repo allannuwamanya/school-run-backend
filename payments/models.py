@@ -22,7 +22,7 @@ class SubscriptionPlan(BaseModel):
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
-        return f"{self.name} (₦{self.monthly_cost}/mo)"
+        return f"{self.name} (UGX {self.monthly_cost}/mo)"
 
     class Meta:
         verbose_name = 'Subscription Plan'
@@ -122,7 +122,7 @@ class Transaction(BaseModel):
     )
 
     def __str__(self):
-        return f"{self.transaction_id} — {self.parent} — ₦{self.amount} ({self.status})"
+        return f"{self.transaction_id} — {self.parent} — UGX {self.amount} ({self.status})"
 
     class Meta:
         verbose_name = 'Transaction'
@@ -145,7 +145,7 @@ class WalletTopUp(BaseModel):
     )
 
     def __str__(self):
-        return f"{self.parent} — {self.credits} credits (₦{self.amount_paid})"
+        return f"{self.parent} — {self.credits} credits (UGX {self.amount_paid})"
 
     class Meta:
         verbose_name = 'Wallet Top-Up'
