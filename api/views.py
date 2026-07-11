@@ -136,12 +136,14 @@ class MeView(APIView):
         return ok(serializer.data)
 
     def patch(self, request):
-        serializer = MePatchSerializer(data=request.data)
+        serializer = MePatchSerializer(data=request.data, context={'request': request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         data = serializer.validated_data
         if 'full_name' in data:
             request.user.full_name = data['full_name']
+        if 'phone' in data:
+            request.user.phone = data['phone']
         if 'preferences' in data:
             prefs = data['preferences']
             if 'push' in prefs:

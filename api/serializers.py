@@ -121,7 +121,17 @@ class MeSerializer(serializers.Serializer):
 
 class MePatchSerializer(serializers.Serializer):
     full_name = serializers.CharField(required=False)
+    phone = serializers.CharField(required=False, max_length=20)
     preferences = serializers.DictField(required=False, child=serializers.BooleanField())
+
+    def validate_phone(self, value):
+        request = self.context.get('request')
+        qs = CustomUser.objects.filter(phone=value)
+        if request:
+            qs = qs.exclude(pk=request.user.pk)
+        if qs.exists():
+            raise serializers.ValidationError('This phone number is already in use.')
+        return value
 
 
 class SchoolSerializer(serializers.ModelSerializer):
