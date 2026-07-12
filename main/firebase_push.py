@@ -79,11 +79,11 @@ def send_push(user, title: str, body: str, data: dict | None = None):
         _log_error(f'FCM send partially failed for user {user.pk}', failures)
 
 
-def notify(recipient, kind: str, title: str, body: str, data: dict | None = None):
+def notify(recipient, kind: str, title: str, body: str, data: dict | None = None, stop=None):
     """Create an in-app Notification row and push it to the recipient's devices."""
     from accounts.models import Notification
     notif = Notification.objects.create(
-        recipient=recipient, kind=kind, title=title, body=body,
+        recipient=recipient, kind=kind, title=title, body=body, stop=stop,
     )
     try:
         send_push(recipient, title, body, data)

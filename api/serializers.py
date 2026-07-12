@@ -455,6 +455,45 @@ class StopEventResultSerializer(serializers.Serializer):
         return str(n.id) if n else None
 
 
+class StopDetailSerializer(serializers.Serializer):
+    """Powers the mobile app's stop-detail screen — what a parent lands on
+    after tapping a PICKUP/ARRIVAL/DROPOFF notification, so it needs the full
+    picture (location, time, who did it) for that one stop, not just today's
+    latest event like the dashboard's `today` field."""
+    id = serializers.SerializerMethodField()
+    status = serializers.CharField()
+    direction = serializers.CharField(source='trip.direction')
+    eta = serializers.TimeField()
+    picked_at = serializers.DateTimeField()
+    picked_point = LatLngField()
+    dropped_at = serializers.DateTimeField()
+    dropped_point = LatLngField()
+    child = serializers.SerializerMethodField()
+    driver = serializers.SerializerMethodField()
+
+    def get_id(self, obj):
+        return str(obj.id)
+
+    def get_child(self, obj):
+        return {
+            'id': str(obj.child.id),
+            'full_name': obj.child.full_name,
+            'photo': obj.child.photo.url if obj.child.photo else None,
+            'school_name': obj.child.school.name,
+        }
+
+    def get_driver(self, obj):
+        driver = obj.trip.driver
+        return {
+            'id': str(driver.id),
+            'full_name': driver.user.full_name,
+            'phone': driver.user.phone,
+            'plate': driver.plate,
+            'photo': None,
+            'rating': float(driver.rating),
+        }
+
+
 class HistoryRowSerializer(serializers.Serializer):
     id = serializers.SerializerMethodField()
     type = serializers.CharField()
@@ -475,10 +514,14 @@ class NotificationSerializer(serializers.ModelSerializer):
     kind = serializers.CharField()
     is_read = serializers.BooleanField()
     created_at = serializers.DateTimeField()
+    stop_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Notification
-        fields = ['id', 'kind', 'title', 'body', 'is_read', 'created_at']
+        fields = ['id', 'kind', 'title', 'body', 'is_read', 'created_at', 'stop_id']
+
+    def get_stop_id(self, obj):
+        return str(obj.stop_id) if obj.stop_id else None
 
 
 class NotificationsReadSerializer(serializers.Serializer):

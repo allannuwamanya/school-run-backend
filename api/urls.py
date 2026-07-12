@@ -29,6 +29,7 @@ urlpatterns = [
     path('driver/trips/<uuid:pk>/complete', views.TripCompleteView.as_view(), name='api-trip-complete'),
     path('driver/location', views.DriverLocationPingView.as_view(), name='api-driver-location'),
     # Stops
+    path('stops/<uuid:pk>', views.StopDetailView.as_view(), name='api-stop-detail'),
     path('stops/<uuid:pk>/pickup', views.StopPickupView.as_view(), name='api-stop-pickup'),
     path('stops/<uuid:pk>/dropoff', views.StopDropoffView.as_view(), name='api-stop-dropoff'),
     path('stops/<uuid:pk>/no-show', views.StopNoShowView.as_view(), name='api-stop-noshow'),

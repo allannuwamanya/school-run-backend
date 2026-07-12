@@ -253,6 +253,16 @@ class Notification(Base):
     title = models.CharField(max_length=160)
     body = models.TextField(blank=True)
     is_read = models.BooleanField(default=False)
+    # Set for PICKUP/ARRIVAL/DROPOFF so the app can deep-link the notification
+    # to that stop's captured location — SET_NULL (not CASCADE) so deleting a
+    # stop doesn't also wipe the parent's notification history.
+    stop = models.ForeignKey(
+        "trips.Stop",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notifications",
+    )
 
     class Meta:
         ordering = ["-created_at"]

@@ -40,6 +40,7 @@ from .serializers import (
     DriverLocationPingSerializer,
     StopNoShowSerializer,
     StopEventResultSerializer,
+    StopDetailSerializer,
     IncidentReportSerializer,
     HistoryRowSerializer,
     NotificationSerializer,
@@ -497,6 +498,7 @@ def process_stop_event(request, stop_id, kind):
             notif_title,
             notif_body,
             {'kind': notif_kind, 'stop_id': str(stop.id)},
+            stop=stop,
         )
 
         if kind == 'pickup':
@@ -536,6 +538,22 @@ def process_stop_event(request, stop_id, kind):
     }
     serializer_result = StopEventResultSerializer(result_data)
     return ok(serializer_result.data)
+
+
+class StopDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            parent = Parent.objects.get(user=request.user)
+        except Parent.DoesNotExist:
+            return err('Only parents can view stop details.', 403)
+        stop = get_object_or_404(
+            Stop.objects.select_related('trip__driver__user', 'child__school'),
+            id=pk,
+            child__parent=parent,
+        )
+        return ok(StopDetailSerializer(stop).data)
 
 
 class StopPickupView(APIView):
