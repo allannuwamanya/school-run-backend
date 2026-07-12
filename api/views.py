@@ -674,8 +674,13 @@ class HistoryView(APIView):
                 'amount': None,
                 'label': 'Completed' if stop.status == Stop.Status.DROPPED else 'No-show',
             })
-        if t == 'rides':
-            history = [h for h in history if h['type'] == 'RIDE']
+        # PAYMENT/EMERGENCY rows don't exist yet (Phase 3/4 stubs — see
+        # HistoryRow's type union) so those tabs correctly render empty for
+        # now; the bug this fixes was falling through to "no filter" for any
+        # `t` other than 'rides', so Payments/Emergency showed every ride.
+        TYPE_FOR_TAB = {'rides': 'RIDE', 'payments': 'PAYMENT', 'emergency': 'EMERGENCY'}
+        if t in TYPE_FOR_TAB:
+            history = [h for h in history if h['type'] == TYPE_FOR_TAB[t]]
         return ok({
             'count': len(history),
             'next': None,
