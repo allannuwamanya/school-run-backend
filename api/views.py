@@ -652,23 +652,28 @@ class HistoryView(APIView):
         except Parent.DoesNotExist:
             return err('Only parents can view history.', 403)
         t = request.query_params.get('type', 'all')
-        trips = Trip.objects.filter(
-            stops__child__parent=parent,
-            status=Trip.Status.COMPLETED,
-        ).distinct().order_by('-service_date')[:50]
+        # A stop belongs in history once THAT child's leg is resolved — not
+        # once the whole trip's status flips to COMPLETED, which only
+        # happens after every stop on the route is resolved. On a shared
+        # route, other stops can belong to other families, so gating on
+        # Trip.status left a parent's history empty indefinitely even after
+        # their own child was picked up and dropped off.
+        stops = Stop.objects.filter(
+            child__parent=parent,
+            status__in=[Stop.Status.DROPPED, Stop.Status.NO_SHOW],
+        ).select_related('trip', 'trip__driver__user', 'child', 'child__school').order_by('-updated_at')[:50]
         history = []
-        for trip in trips:
-            stops = trip.stops.filter(child__parent=parent)
-            for stop in stops:
-                history.append({
-                    'id': stop.id,
-                    'type': 'RIDE',
-                    'at': stop.picked_at or stop.dropped_at or trip.service_date,
-                    'title': f'{stop.child.full_name} — {"School" if trip.direction == "TO_SCHOOL" else "Home"}',
-                    'subtitle': f'{trip.driver.user.full_name} · {trip.driver.plate} · {stop.child.school.name}',
-                    'amount': None,
-                    'label': 'Completed',
-                })
+        for stop in stops:
+            trip = stop.trip
+            history.append({
+                'id': stop.id,
+                'type': 'RIDE',
+                'at': stop.dropped_at or stop.picked_at or stop.updated_at,
+                'title': f'{stop.child.full_name} — {"School" if trip.direction == "TO_SCHOOL" else "Home"}',
+                'subtitle': f'{trip.driver.user.full_name} · {trip.driver.plate} · {stop.child.school.name}',
+                'amount': None,
+                'label': 'Completed' if stop.status == Stop.Status.DROPPED else 'No-show',
+            })
         if t == 'rides':
             history = [h for h in history if h['type'] == 'RIDE']
         return ok({
