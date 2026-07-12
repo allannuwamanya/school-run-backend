@@ -285,8 +285,16 @@ class DashboardView(APIView):
             parent = Parent.objects.get(user=request.user)
         except Parent.DoesNotExist:
             return err('Only parents can view dashboard.', 403)
-        children = Child.objects.filter(parent=parent, is_active=True)
-        serializer = DashboardSerializer({'children': list(children)})
+        children = list(Child.objects.filter(parent=parent, is_active=True))
+        # There's no Celery beat/worker deployed to run generate_daily_manifests
+        # on a nightly cron (see trips/tasks.py), so today's trip/stops never
+        # materialized on their own — only ChildScheduleView.put triggered
+        # this, which is why the schedule looked "stuck" until a parent
+        # re-saved it. Lazily ensure today's trip exists on every dashboard
+        # load instead of waiting on infra that isn't running.
+        for child in children:
+            sync_trip_for_schedule(child)
+        serializer = DashboardSerializer({'children': children})
         return ok(serializer.data)
 
 
@@ -316,6 +324,15 @@ class DriverManifestView(APIView):
         except Driver.DoesNotExist:
             return err('Driver profile not found.', 404)
         d = request.query_params.get('date', today_date().isoformat())
+        if d == today_date().isoformat():
+            # Same lazy materialization as DashboardView — covers a driver
+            # opening their manifest before any parent has opened the
+            # dashboard yet today.
+            parent_ids = Assignment.objects.filter(
+                driver=driver, is_active=True
+            ).values_list('parent_id', flat=True)
+            for child in Child.objects.filter(parent_id__in=parent_ids, is_active=True):
+                sync_trip_for_schedule(child)
         trips = Trip.objects.filter(driver=driver, service_date=d).prefetch_related('stops__child')
         serializer = ManifestSerializer({'trips': list(trips)})
         return ok(serializer.data)
