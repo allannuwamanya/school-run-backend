@@ -38,6 +38,14 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
+      # Firebase Admin SDK service-account JSON for the schoolrun-5201b
+      # project (Firebase console → Project settings → Service accounts →
+      # Generate new private key). Paste the whole JSON as this env var's
+      # value in the Render dashboard. Without it, main/firebase_push._init()
+      # can't initialize and send_push() silently no-ops — in-app
+      # notifications still save, but no device push is ever delivered.
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
 
   - type: redis
     name: schoolrun-redis
