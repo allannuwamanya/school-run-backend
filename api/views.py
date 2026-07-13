@@ -760,9 +760,24 @@ class DeviceRegisterView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         data = serializer.validated_data
+        token = data['fcm_token']
+        # A physical device belongs to whoever last signed in on it — drop any
+        # other account's claim on this token so pushes don't reach a device
+        # after that user has logged out and someone else uses it.
+        Device.objects.filter(fcm_token=token).exclude(user=request.user).delete()
         Device.objects.update_or_create(
             user=request.user,
-            fcm_token=data['fcm_token'],
+            fcm_token=token,
             defaults={'platform': data.get('platform', 'web')},
         )
+        return Response(None, status=status.HTTP_204_NO_CONTENT)
+
+    def delete(self, request):
+        # Called on logout to stop this device receiving the user's pushes.
+        # With a token, unregister just this device; without, all of theirs.
+        qs = Device.objects.filter(user=request.user)
+        token = request.query_params.get('token')
+        if token:
+            qs = qs.filter(fcm_token=token)
+        qs.delete()
         return Response(None, status=status.HTTP_204_NO_CONTENT)
