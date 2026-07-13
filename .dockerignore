@@ -20,3 +20,8 @@ __pycache__/
 media/
 staticfiles/
 *.log
+.env
+.env.*
+!.env.production.example
+.venv/
+.venv*/

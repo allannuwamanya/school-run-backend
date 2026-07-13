@@ -14,6 +14,8 @@ services:
     networks:
       - app-network
     depends_on:
+      schoolrun-postgres:
+        condition: service_healthy
       schoolrun-redis:
         condition: service_healthy
     healthcheck:
@@ -41,10 +43,33 @@ services:
     networks:
       - app-network
     depends_on:
+      schoolrun-postgres:
+        condition: service_healthy
       schoolrun-redis:
         condition: service_healthy
       schoolrun-web:
         condition: service_healthy
+
+  schoolrun-postgres:
+    # PostGIS image — GeoDjango stores native geography columns (pickup
+    # points, GPS trails), so a plain postgres image won't do.
+    image: postgis/postgis:16-3.4
+    container_name: schoolrun-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-schoolrun}
+      POSTGRES_USER: ${POSTGRES_USER:-schoolrun}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - schoolrun_pg_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-schoolrun} -d ${POSTGRES_DB:-schoolrun}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # No `ports:` — only reachable inside app-network by service name.
 
   schoolrun-redis:
     image: redis:7-alpine
@@ -63,6 +88,7 @@ services:
 
 volumes:
   schoolrun_redis_data:
+  schoolrun_pg_data:
 
 networks:
   app-network:
