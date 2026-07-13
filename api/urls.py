@@ -40,6 +40,7 @@ urlpatterns = [
     # Notifications
     path('notifications', views.NotificationListView.as_view(), name='api-notifications'),
     path('notifications/read', views.NotificationReadView.as_view(), name='api-notifications-read'),
+    path('notifications/<uuid:pk>', views.NotificationDetailView.as_view(), name='api-notification-detail'),
     # Devices
     path('devices', views.DeviceRegisterView.as_view(), name='api-devices'),
 

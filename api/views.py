@@ -723,6 +723,18 @@ class NotificationListView(APIView):
             'results': serializer.data,
         })
 
+    def delete(self, request):
+        Notification.objects.filter(recipient=request.user).delete()
+        return Response(None, status=status.HTTP_204_NO_CONTENT)
+
+
+class NotificationDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        get_object_or_404(Notification, id=pk, recipient=request.user).delete()
+        return Response(None, status=status.HTTP_204_NO_CONTENT)
+
 
 class NotificationReadView(APIView):
     permission_classes = [IsAuthenticated]
