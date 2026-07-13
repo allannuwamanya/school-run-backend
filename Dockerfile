@@ -38,9 +38,11 @@ COPY --from=builder /usr/local/bin/ /usr/local/bin/
 # Copy application source
 COPY . .
 
-# Copy entrypoint
+# Copy entrypoint. Strip any CRLF the file may carry from a Windows checkout —
+# a `\r` in the shebang makes the kernel look for `/bin/bash\r` and fail with
+# "no such file or directory".
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["uvicorn", "main.asgi:application", "--host", "0.0.0.0", "--port", "8000"]
