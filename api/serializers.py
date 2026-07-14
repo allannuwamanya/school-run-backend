@@ -19,9 +19,11 @@ class LatLngField(serializers.Field):
 
 
 class AuthUserSerializer(serializers.ModelSerializer):
+    is_super_admin = serializers.BooleanField(source='is_superuser', read_only=True)
+
     class Meta:
         model = CustomUser
-        fields = ['id', 'role', 'full_name', 'phone']
+        fields = ['id', 'role', 'full_name', 'phone', 'is_super_admin']
 
 
 class RegisterSerializer(serializers.ModelSerializer):

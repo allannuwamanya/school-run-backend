@@ -3,7 +3,7 @@ from datetime import date
 from rest_framework.test import APITestCase
 from rest_framework import status
 
-from accounts.models import CustomUser, Driver, Parent
+from accounts.models import AdminActionLog, CustomUser, Driver, Parent
 from children.models import School, Child
 from trips.models import Assignment, Trip, Stop
 from incidents.models import Incident
@@ -26,6 +26,12 @@ def make_parent(phone="0700000002"):
 
 def make_admin(phone="0700000009"):
     return CustomUser.objects.create(phone=phone, role=CustomUser.Role.ADMIN, is_staff=True)
+
+
+def make_super_admin(phone="0700000010"):
+    return CustomUser.objects.create(
+        phone=phone, role=CustomUser.Role.ADMIN, is_staff=True, is_superuser=True,
+    )
 
 
 def make_child(parent, school):
@@ -160,3 +166,109 @@ class IncidentReportTest(APITestCase):
     def test_requires_authentication(self):
         resp = self.client.post("/api/incidents", {"description": "x"}, format="json")
         self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class AdminStaffTest(APITestCase):
+    """Only Super Admins (is_superuser) may manage console accounts. Regular
+    admins can view the staff list but not add or deactivate other admins."""
+
+    def setUp(self):
+        self.super_admin = make_super_admin()
+        self.admin = make_admin()
+
+    def test_list_reports_can_manage_true_for_super_admin(self):
+        self.client.force_authenticate(user=self.super_admin)
+        resp = self.client.get("/api/admin/staff")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.data["can_manage"])
+        # The super admin's own row is flagged.
+        me = next(r for r in resp.data["results"] if r["id"] == self.super_admin.id)
+        self.assertTrue(me["is_super_admin"])
+        self.assertTrue(me["is_you"])
+
+    def test_list_reports_can_manage_false_for_regular_admin(self):
+        self.client.force_authenticate(user=self.admin)
+        resp = self.client.get("/api/admin/staff")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertFalse(resp.data["can_manage"])
+
+    def test_super_admin_can_create_admin_and_it_is_logged(self):
+        self.client.force_authenticate(user=self.super_admin)
+        resp = self.client.post(
+            "/api/admin/staff",
+            {"full_name": "New Admin", "phone": "0700000123", "password": "secret1"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        created = CustomUser.objects.get(phone="0700000123")
+        self.assertEqual(created.role, CustomUser.Role.ADMIN)
+        self.assertTrue(created.is_staff)
+        self.assertFalse(created.is_superuser)  # new admins are not Super Admins
+        self.assertFalse(resp.data["is_super_admin"])
+        self.assertTrue(AdminActionLog.objects.filter(action="staff.create", target_id=str(created.id)).exists())
+
+    def test_regular_admin_cannot_create_admin(self):
+        self.client.force_authenticate(user=self.admin)
+        resp = self.client.post(
+            "/api/admin/staff",
+            {"full_name": "Nope", "phone": "0700000124", "password": "secret1"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(CustomUser.objects.filter(phone="0700000124").exists())
+
+    def test_super_admin_can_toggle_another_admin_and_it_is_logged(self):
+        self.client.force_authenticate(user=self.super_admin)
+        resp = self.client.post(f"/api/admin/staff/{self.admin.id}/toggle")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.admin.refresh_from_db()
+        self.assertFalse(self.admin.is_active)
+        self.assertTrue(AdminActionLog.objects.filter(action="staff.deactivate", target_id=str(self.admin.id)).exists())
+
+    def test_super_admin_cannot_deactivate_self(self):
+        self.client.force_authenticate(user=self.super_admin)
+        resp = self.client.post(f"/api/admin/staff/{self.super_admin.id}/toggle")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.super_admin.refresh_from_db()
+        self.assertTrue(self.super_admin.is_active)
+
+    def test_regular_admin_cannot_toggle(self):
+        self.client.force_authenticate(user=self.admin)
+        resp = self.client.post(f"/api/admin/staff/{self.super_admin.id}/toggle")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class AdminAuditLogTest(APITestCase):
+    """Mutating admin actions are recorded and readable via /admin/audit."""
+
+    def setUp(self):
+        self.admin = make_admin()
+        self.driver = make_driver()
+        self.client.force_authenticate(user=self.admin)
+
+    def test_mutating_action_is_recorded_and_listed(self):
+        self.driver.is_verified = False
+        self.driver.save()
+
+        resp = self.client.post(f"/api/admin/drivers/{self.driver.id}/approve")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+        entry = AdminActionLog.objects.filter(action="driver.approve").first()
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.actor, self.admin)
+
+        listing = self.client.get("/api/admin/audit")
+        self.assertEqual(listing.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(listing.data["count"], 1)
+        self.assertTrue(any(r["action"] == "driver.approve" for r in listing.data["results"]))
+
+    def test_audit_search_filters_results(self):
+        self.client.post(f"/api/admin/drivers/{self.driver.id}/approve")
+        resp = self.client.get("/api/admin/audit", {"q": "no-such-actor-xyz"})
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["count"], 0)
+
+    def test_audit_requires_admin(self):
+        self.client.force_authenticate(user=self.driver.user)
+        resp = self.client.get("/api/admin/audit")
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)

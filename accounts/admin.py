@@ -39,3 +39,22 @@ class AccountDeletionLogAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(models.AdminActionLog)
+class AdminActionLogAdmin(admin.ModelAdmin):
+    """View-only audit trail of admin console actions. Read-only, and
+    models.AdminActionLog blocks delete() itself."""
+    list_display = ("created_at", "actor_name", "action", "summary")
+    list_filter = ("action", "target_type")
+    search_fields = ("actor_name", "summary", "target_label")
+    ordering = ("-created_at",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

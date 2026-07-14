@@ -236,6 +236,38 @@ class ErrorLog(models.Model):
         return f"[{self.level}] {self.timestamp}: {self.message[:50]}"
 
 
+class AdminActionLog(models.Model):
+    """Audit trail of every mutating action an admin takes in the console —
+    approving drivers, suspending parents, refunds, password resets, staff
+    changes, etc. Snapshots the actor name and a human-readable target label
+    so the entry stays meaningful even if the underlying account is later
+    deleted. Undeletable so it can't be quietly wiped."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+        related_name="admin_actions",
+    )
+    actor_name = models.CharField(max_length=120, blank=True)
+    action = models.CharField(max_length=50)  # e.g. "driver.approve"
+    summary = models.CharField(max_length=255)  # human-readable one-liner
+    target_type = models.CharField(max_length=30, blank=True)  # e.g. "driver"
+    target_id = models.CharField(max_length=64, blank=True)
+    target_label = models.CharField(max_length=160, blank=True)
+
+    objects = UndeletableQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["-created_at"])]
+
+    def delete(self, *args, **kwargs):
+        raise PermissionDenied("Admin action logs cannot be deleted.")
+
+    def __str__(self):
+        return f"{self.actor_name or 'system'}: {self.summary}"
+
+
 class Notification(Base):
     class Kind(models.TextChoices):
         PICKUP = "PICKUP", "Picked up"

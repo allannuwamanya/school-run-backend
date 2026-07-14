@@ -104,6 +104,7 @@ class LoginView(APIView):
                 'role': user.role,
                 'full_name': user.full_name,
                 'phone': user.phone,
+                'is_super_admin': user.is_superuser,
             },
         })
 
@@ -125,6 +126,7 @@ class GoogleLoginView(APIView):
                 'role': user.role,
                 'full_name': user.full_name,
                 'phone': user.phone,
+                'is_super_admin': user.is_superuser,
             },
         })
 

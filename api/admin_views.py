@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from django.core.paginator import Paginator
-from django.db.models import Avg, Sum
+from django.db.models import Avg, Q, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -10,7 +10,15 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import AccountDeletionLog, CustomUser, Driver, Notification, Parent, VerificationDocument
+from accounts.models import (
+    AccountDeletionLog,
+    AdminActionLog,
+    CustomUser,
+    Driver,
+    Notification,
+    Parent,
+    VerificationDocument,
+)
 from children.models import Child
 from incidents.models import Incident, IncidentTimeline
 from main.firebase_push import notify, notify_admins
@@ -46,6 +54,29 @@ def ok(data, status_code=200):
 
 def err(detail, status_code=400):
     return Response({"detail": detail}, status=status_code)
+
+
+def is_super_admin(user):
+    """Super Admins (Django superusers) are the only admins allowed to
+    manage other console accounts."""
+    return bool(getattr(user, "is_superuser", False))
+
+
+def log_action(request, action, summary, target_type="", target_id="", target_label=""):
+    """Record an admin mutation to the audit trail. Best-effort: a logging
+    failure must never break the action the admin actually performed."""
+    try:
+        AdminActionLog.objects.create(
+            actor=request.user if getattr(request.user, "is_authenticated", False) else None,
+            actor_name=(getattr(request.user, "full_name", "") or getattr(request.user, "phone", "") or ""),
+            action=action,
+            summary=summary[:255],
+            target_type=target_type,
+            target_id=str(target_id)[:64],
+            target_label=(target_label or "")[:160],
+        )
+    except Exception:  # pragma: no cover - audit logging is non-critical
+        pass
 
 
 def _resolve_zone(zone_name):
@@ -246,6 +277,10 @@ class AdminDriverListView(APIView):
             zone=zone,
             driver_since=timezone.now().date(),
         )
+        log_action(
+            request, "driver.create", f"Added driver {user.full_name or phone}",
+            "driver", driver.id, user.full_name or phone,
+        )
         return ok(serialize_driver_detail(driver, request), 201)
 
 
@@ -264,6 +299,10 @@ class AdminDriverApproveView(APIView):
         driver = get_object_or_404(Driver, pk=pk)
         driver.is_verified = True
         driver.save()
+        log_action(
+            request, "driver.approve", f"Approved driver {driver.user.full_name or driver.user.phone}",
+            "driver", driver.id, driver.user.full_name or driver.user.phone,
+        )
         return ok(serialize_driver_detail(driver, request))
 
 
@@ -274,6 +313,10 @@ class AdminDriverRejectView(APIView):
         driver = get_object_or_404(Driver, pk=pk)
         driver.is_verified = False
         driver.save()
+        log_action(
+            request, "driver.reject", f"Rejected driver {driver.user.full_name or driver.user.phone}",
+            "driver", driver.id, driver.user.full_name or driver.user.phone,
+        )
         return ok(None, 204)
 
 
@@ -286,6 +329,10 @@ class AdminDriverRequestDocsView(APIView):
         for doc_type in REQUIRED_DOC_TYPES:
             if doc_type not in existing:
                 VerificationDocument.objects.create(driver=driver, doc_type=doc_type, status=VerificationDocument.Status.PENDING)
+        log_action(
+            request, "driver.request_docs", f"Requested documents from {driver.user.full_name or driver.user.phone}",
+            "driver", driver.id, driver.user.full_name or driver.user.phone,
+        )
         return ok(serialize_driver_detail(driver, request))
 
 
@@ -311,6 +358,10 @@ class AdminDriverDocumentUploadView(APIView):
                 "verified_at": timezone.now(),
             },
         )
+        log_action(
+            request, "driver.upload_doc", f"Uploaded {doc_type} for {driver.user.full_name or driver.user.phone}",
+            "driver", driver.id, driver.user.full_name or driver.user.phone,
+        )
         return ok(serialize_driver_detail(driver, request), 201)
 
 
@@ -324,6 +375,10 @@ class AdminDriverUpdateNinNumberView(APIView):
             return err("NIN number is required.", 400)
         driver.user.nin_number = nin_number
         driver.user.save(update_fields=["nin_number"])
+        log_action(
+            request, "driver.update_nin", f"Updated NIN number for {driver.user.full_name or driver.user.phone}",
+            "driver", driver.id, driver.user.full_name or driver.user.phone,
+        )
         return ok(serialize_driver_detail(driver, request))
 
 
@@ -334,6 +389,10 @@ class AdminDriverVerifyNinView(APIView):
         driver = get_object_or_404(Driver.objects.select_related("user"), pk=pk)
         driver.user.nin_verified = True
         driver.user.save(update_fields=["nin_verified"])
+        log_action(
+            request, "driver.verify_nin", f"Verified NIN for driver {driver.user.full_name or driver.user.phone}",
+            "driver", driver.id, driver.user.full_name or driver.user.phone,
+        )
         return ok(serialize_driver_detail(driver, request))
 
 
@@ -344,6 +403,10 @@ class AdminDriverRejectNinView(APIView):
         driver = get_object_or_404(Driver.objects.select_related("user"), pk=pk)
         driver.user.nin_verified = False
         driver.user.save(update_fields=["nin_verified"])
+        log_action(
+            request, "driver.reject_nin", f"Rejected NIN for driver {driver.user.full_name or driver.user.phone}",
+            "driver", driver.id, driver.user.full_name or driver.user.phone,
+        )
         return ok(serialize_driver_detail(driver, request))
 
 
@@ -422,6 +485,10 @@ class AdminParentListView(APIView):
             emergency_contact=body.get("emergency_contact", ""),
             zone=zone,
         )
+        log_action(
+            request, "parent.create", f"Added parent {user.full_name or phone}",
+            "parent", parent.id, user.full_name or phone,
+        )
         return ok(serialize_parent_row(parent), 201)
 
 
@@ -440,6 +507,13 @@ class AdminParentSuspendView(APIView):
         parent = get_object_or_404(Parent.objects.select_related("user"), pk=pk)
         parent.user.is_active = not parent.user.is_active
         parent.user.save()
+        name = parent.user.full_name or parent.user.phone
+        log_action(
+            request,
+            "parent.activate" if parent.user.is_active else "parent.suspend",
+            f"{'Reactivated' if parent.user.is_active else 'Suspended'} parent {name}",
+            "parent", parent.id, name,
+        )
         return ok(serialize_parent_row(parent))
 
 
@@ -456,6 +530,8 @@ class AdminParentVerifyNinView(APIView):
             "ID verification approved",
             "Your identity verification is complete.",
         )
+        name = parent.user.full_name or parent.user.phone
+        log_action(request, "parent.verify_nin", f"Verified NIN for parent {name}", "parent", parent.id, name)
         return ok(serialize_parent_row(parent))
 
 
@@ -472,6 +548,8 @@ class AdminParentRejectNinView(APIView):
             "ID verification rejected",
             "We couldn't verify your ID — please resubmit your NIN details.",
         )
+        name = parent.user.full_name or parent.user.phone
+        log_action(request, "parent.reject_nin", f"Rejected NIN for parent {name}", "parent", parent.id, name)
         return ok(serialize_parent_row(parent))
 
 
@@ -489,6 +567,11 @@ class AdminParentAssignDriverView(APIView):
 
         Assignment.objects.filter(parent=parent, is_active=True).update(is_active=False)
         Assignment.objects.create(parent=parent, driver=driver, is_active=True)
+        log_action(
+            request, "parent.assign_driver",
+            f"Assigned {driver.user.full_name or driver.user.phone} to {parent.user.full_name or parent.user.phone}",
+            "parent", parent.id, parent.user.full_name or parent.user.phone,
+        )
 
         # Reflect the new assignment on the driver's manifest immediately for
         # any of the parent's children already scheduled for today, rather
@@ -505,6 +588,11 @@ class AdminParentUnassignDriverView(APIView):
     def post(self, request, pk):
         parent = get_object_or_404(Parent, pk=pk)
         Assignment.objects.filter(parent=parent, is_active=True).update(is_active=False)
+        log_action(
+            request, "parent.unassign_driver",
+            f"Unassigned driver from {parent.user.full_name or parent.user.phone}",
+            "parent", parent.id, parent.user.full_name or parent.user.phone,
+        )
         return ok(serialize_parent_row(parent))
 
 
@@ -613,6 +701,11 @@ class AdminEmergencyDispatchView(APIView):
             },
         )
 
+        log_action(
+            request, "dispatch.emergency",
+            f"Triggered emergency dispatch for {trip.driver.user.full_name}'s van ({incident.incident_id})",
+            "incident", incident.id, incident.incident_id,
+        )
         return ok(serialize_incident_detail(incident), 201)
 
 
@@ -699,6 +792,10 @@ class AdminRefundTransactionView(APIView):
         txn.status = Transaction.REFUNDED
         txn.processed_at = timezone.now()
         txn.save()
+        log_action(
+            request, "transaction.refund", f"Refunded transaction {txn.id}",
+            "transaction", txn.id, str(txn.id),
+        )
         return ok(serialize_transaction(txn))
 
 
@@ -739,6 +836,10 @@ class AdminIncidentResolveView(APIView):
         incident.save()
         IncidentTimeline.objects.create(
             incident=incident, actor=request.user, event_text=f"Marked resolved by {request.user.full_name}"
+        )
+        log_action(
+            request, "incident.resolve", f"Resolved incident {incident.incident_id}",
+            "incident", incident.id, incident.incident_id,
         )
         return ok(serialize_incident_detail(incident))
 
@@ -858,6 +959,8 @@ class AdminUserSetPasswordView(APIView):
             return err("Password must be at least 6 characters.", 400)
         user.set_password(password)
         user.save(update_fields=["password"])
+        name = user.full_name or user.phone
+        log_action(request, "user.set_password", f"Reset password for {name}", "user", user.id, name)
         return ok({"id": str(user.id)})
 
 
@@ -888,4 +991,136 @@ class AdminUserDeleteView(APIView):
             children_deleted=children_deleted,
             trips_deleted=trips_deleted,
         )
+        log_action(
+            request, "user.delete",
+            f"Deleted {target_role.lower()} {target_full_name}",
+            "user", target_user_id, target_full_name,
+        )
         return ok(None, 204)
+
+
+def serialize_staff_row(user, request_user):
+    """Admin (console-access) account row for the Staff screen."""
+    return {
+        "id": user.id,
+        "full_name": user.full_name or user.phone or "",
+        "phone": user.phone or "",
+        "is_active": user.is_active,
+        "is_super_admin": bool(user.is_superuser),
+        "is_you": user.id == request_user.id,
+    }
+
+
+class AdminStaffListView(APIView):
+    """Admin console accounts (role=ADMIN). Distinct from AdminUserListView,
+    which manages parent/driver logins. Any admin can view; only Super Admins
+    can add or deactivate other admins (`can_manage`)."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        staff = CustomUser.objects.filter(role=CustomUser.Role.ADMIN).order_by("-id")
+        rows = [serialize_staff_row(u, request.user) for u in staff]
+        return ok({"results": rows, "can_manage": is_super_admin(request.user)})
+
+    def post(self, request):
+        if not is_super_admin(request.user):
+            return err("Only Super Admins can add admin accounts.", 403)
+
+        full_name = (request.data.get("full_name") or "").strip()
+        phone = (request.data.get("phone") or "").strip()
+        password = (request.data.get("password") or "").strip()
+
+        if not full_name:
+            return err("Full name is required.", 400)
+        if not phone:
+            return err("Phone is required.", 400)
+        if len(password) < 6:
+            return err("Password must be at least 6 characters.", 400)
+        if CustomUser.all_objects.filter(phone=phone).exists():
+            return err("An account with that phone already exists.", 400)
+
+        user = CustomUser.objects.create_user(
+            phone=phone,
+            password=password,
+            full_name=full_name,
+            role=CustomUser.Role.ADMIN,
+            is_staff=True,
+        )
+        log_action(request, "staff.create", f"Added admin {full_name}", "staff", user.id, full_name)
+        return ok(serialize_staff_row(user, request.user), 201)
+
+
+class AdminStaffToggleView(APIView):
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        if not is_super_admin(request.user):
+            return err("Only Super Admins can deactivate admin accounts.", 403)
+
+        user = get_object_or_404(CustomUser, pk=pk, role=CustomUser.Role.ADMIN)
+        if user.id == request.user.id:
+            return err("You can't deactivate your own account.", 400)
+        user.is_active = not user.is_active
+        user.save(update_fields=["is_active"])
+        name = user.full_name or user.phone
+        log_action(
+            request,
+            "staff.activate" if user.is_active else "staff.deactivate",
+            f"{'Reactivated' if user.is_active else 'Deactivated'} admin {name}",
+            "staff", user.id, name,
+        )
+        return ok(serialize_staff_row(user, request.user))
+
+
+AUDIT_PAGE_SIZE = 50
+
+
+def serialize_audit_row(entry):
+    return {
+        "id": str(entry.id),
+        "created_at": entry.created_at.isoformat(),
+        "actor_name": entry.actor_name or "System",
+        "action": entry.action,
+        "summary": entry.summary,
+        "target_type": entry.target_type,
+        "target_id": entry.target_id,
+        "target_label": entry.target_label,
+    }
+
+
+class AdminAuditLogView(APIView):
+    """Read-only audit trail of admin mutations. Filterable by free-text
+    (`q`) across actor/summary and by `action`, paginated."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        entries = AdminActionLog.objects.select_related("actor").all()
+
+        action = (request.query_params.get("action") or "").strip()
+        if action:
+            entries = entries.filter(action=action)
+
+        q = (request.query_params.get("q") or "").strip()
+        if q:
+            entries = entries.filter(
+                Q(actor_name__icontains=q)
+                | Q(summary__icontains=q)
+                | Q(target_label__icontains=q)
+            )
+
+        try:
+            page_number = int(request.query_params.get("page") or 1)
+        except ValueError:
+            page_number = 1
+
+        paginator = Paginator(entries, AUDIT_PAGE_SIZE)
+        page = paginator.get_page(page_number)
+
+        return ok(
+            {
+                "count": paginator.count,
+                "page": page.number,
+                "num_pages": paginator.num_pages,
+                "results": [serialize_audit_row(e) for e in page.object_list],
+            }
+        )
