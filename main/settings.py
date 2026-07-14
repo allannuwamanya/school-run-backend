@@ -33,8 +33,8 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = str(os.environ.get('DEBUG')) == "1"  # 1 == True
 
-# Render terminates TLS at its edge and forwards plain HTTP to the app with
-# this header set — without it, request.build_absolute_uri() (used for
+# The nginx reverse proxy terminates TLS and forwards plain HTTP to the app
+# with this header set — without it, request.build_absolute_uri() (used for
 # uploaded-document URLs) would report an http:// URL even in production.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
