@@ -14,6 +14,7 @@ urlpatterns = [
     path('auth/refresh', TokenRefreshView.as_view(), name='auth-refresh'),
     # Account
     path('me', views.MeView.as_view(), name='api-me'),
+    path('me/change-password', views.MeChangePasswordView.as_view(), name='api-me-change-password'),
     # Schools
     path('schools', views.SchoolListView.as_view(), name='api-schools'),
     # Children

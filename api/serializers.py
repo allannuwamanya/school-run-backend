@@ -23,7 +23,7 @@ class AuthUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ['id', 'role', 'full_name', 'phone', 'is_super_admin']
+        fields = ['id', 'role', 'full_name', 'phone', 'is_super_admin', 'must_change_password']
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -133,6 +133,17 @@ class MePatchSerializer(serializers.Serializer):
             qs = qs.exclude(pk=request.user.pk)
         if qs.exists():
             raise serializers.ValidationError('This phone number is already in use.')
+        return value
+
+
+class MeChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=6)
+
+    def validate_current_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError('Current password is incorrect.')
         return value
 
 

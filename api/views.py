@@ -28,6 +28,7 @@ from .serializers import (
     GoogleLoginSerializer,
     MeSerializer,
     MePatchSerializer,
+    MeChangePasswordSerializer,
     SchoolSerializer,
     ChildListSerializer,
     ChildCreateSerializer,
@@ -105,6 +106,7 @@ class LoginView(APIView):
                 'full_name': user.full_name,
                 'phone': user.phone,
                 'is_super_admin': user.is_superuser,
+                'must_change_password': user.must_change_password,
             },
         })
 
@@ -127,6 +129,7 @@ class GoogleLoginView(APIView):
                 'full_name': user.full_name,
                 'phone': user.phone,
                 'is_super_admin': user.is_superuser,
+                'must_change_password': user.must_change_password,
             },
         })
 
@@ -160,6 +163,23 @@ class MeView(APIView):
                 request.user.dark_mode = prefs['dark_mode']
         request.user.save()
         return ok(MeSerializer(request.user).data)
+
+
+class MeChangePasswordView(APIView):
+    """Self-service password change. The one write endpoint a
+    must_change_password user can still reach (see
+    accounts.middleware.ForcePasswordChangeMiddleware) — clearing the flag
+    here is what lets them back into the rest of the API."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = MeChangePasswordSerializer(data=request.data, context={'request': request})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        request.user.set_password(serializer.validated_data['new_password'])
+        request.user.must_change_password = False
+        request.user.save(update_fields=['password', 'must_change_password'])
+        return ok(None)
 
 
 class SchoolListView(APIView):

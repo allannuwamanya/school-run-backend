@@ -266,6 +266,7 @@ class AdminDriverListView(APIView):
             date_of_birth=date_of_birth,
             gender=gender,
             push_notifications_enabled=True,
+            must_change_password=True,
         )
         driver = Driver.objects.create(
             user=user,
@@ -958,7 +959,8 @@ class AdminUserSetPasswordView(APIView):
         if len(password) < 6:
             return err("Password must be at least 6 characters.", 400)
         user.set_password(password)
-        user.save(update_fields=["password"])
+        user.must_change_password = True
+        user.save(update_fields=["password", "must_change_password"])
         name = user.full_name or user.phone
         log_action(request, "user.set_password", f"Reset password for {name}", "user", user.id, name)
         return ok({"id": str(user.id)})
@@ -1045,6 +1047,7 @@ class AdminStaffListView(APIView):
             full_name=full_name,
             role=CustomUser.Role.ADMIN,
             is_staff=True,
+            must_change_password=True,
         )
         log_action(request, "staff.create", f"Added admin {full_name}", "staff", user.id, full_name)
         return ok(serialize_staff_row(user, request.user), 201)

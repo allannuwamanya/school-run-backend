@@ -78,6 +78,11 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    # Set when an admin creates/resets this account with a temporary
+    # password (AdminStaffListView, AdminDriverListView, AdminUserSetPasswordView)
+    # — ForcePasswordChangeMiddleware blocks everything but /me and
+    # /me/change-password until the user sets their own password.
+    must_change_password = models.BooleanField(default=False)
 
     # preferences & verification from contract
     nin_verified = models.BooleanField(default=False)
