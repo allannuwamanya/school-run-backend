@@ -1,15 +1,60 @@
-name: Deploy backend to VPS
+name: Backend CI/CD
 
-# Every push to main ships the backend to the VPS: package the committed code,
-# copy it over SSH, and rebuild the compose stack. The VPS never needs GitHub
-# access (org policy disables deploy keys) — Actions pushes to it instead.
+# Push to main runs the test suite; only if it passes does the deploy job ship
+# the code to the VPS and rebuild. The VPS never needs GitHub access (org
+# policy disables deploy keys) — Actions pushes to it over SSH instead.
 on:
   push:
     branches: [main]
   workflow_dispatch: {} # allow manual runs from the Actions tab
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # PostGIS so tests exercise the same geography columns as production.
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: schoolrun
+          POSTGRES_USER: schoolrun
+          POSTGRES_PASSWORD: schoolrun
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U schoolrun"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      SECRET_KEY: ci-test-secret-not-used-in-prod
+      DEBUG: "1"
+      DB_CHOICE: postgres
+      DATABASE_URL: postgres://schoolrun:schoolrun@localhost:5432/schoolrun
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      CELERY_RESULT_BACKEND: redis://localhost:6379/0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install GDAL/GEOS/PROJ (GeoDjango needs system libgdal)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends binutils libproj-dev gdal-bin libgdal-dev
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: python manage.py test --noinput --verbosity 2
+
   deploy:
+    needs: test # deploy only runs if the test job succeeds
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,9 +67,9 @@ jobs:
           ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Package committed code
-        # git archive excludes gitignored files, so .env and the Firebase key
-        # already on the server are never overwritten — tar-extract only adds/
-        # updates tracked files.
+        # git archive excludes gitignored files, so the server's .env and
+        # Firebase key are never overwritten — tar-extract only adds/updates
+        # tracked files.
         run: git archive --format=tar.gz -o backend.tar.gz HEAD
 
       - name: Copy to VPS
