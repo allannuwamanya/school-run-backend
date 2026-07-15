@@ -39,6 +39,7 @@ from .admin_serializers import (
     serialize_parent_row,
     serialize_route,
     serialize_transaction,
+    serialize_trip_route,
     serialize_user_row,
     serialize_zone,
 )
@@ -661,7 +662,8 @@ class AdminDriverTrailView(APIView):
             {
                 "points": [
                     {"lat": p.point.y, "lng": p.point.x, "at": p.created_at.isoformat()} for p in pings
-                ]
+                ],
+                "route": serialize_trip_route(trip),
             }
         )
 

@@ -15,7 +15,7 @@ from django.utils import timezone
 from accounts.models import CustomUser, VerificationDocument
 from incidents.models import Incident
 from payments.models import Subscription, Transaction
-from trips.models import Assignment, Stop
+from trips.models import Assignment, Stop, Trip
 
 REQUIRED_DOC_TYPES = [
     VerificationDocument.DocType.LICENSE,
@@ -384,6 +384,49 @@ def _trip_current_point(trip):
             return {"lat": float(point.y), "lng": float(point.x), "stale": True, "approximate": True}
     
     return None
+
+
+def serialize_trip_route(trip):
+    """The planned path for a tracked trip, so the dispatch map can draw the
+    driver's route rather than just a lone dot. For a to-school run it's the
+    children's pickup points (in stop order) ending at the school; for a
+    to-home run it's the school out to each drop-off. Returns None when the
+    trip has no stops or is missing pickup/school coordinates."""
+    stops = list(
+        trip.stops.select_related("child__school").order_by("sequence")
+    )
+    pickups = []
+    school_point = None
+    for s in stops:
+        pt = s.child.pickup_point
+        if pt:
+            pickups.append({"lat": float(pt.y), "lng": float(pt.x)})
+        school = s.child.school
+        if school_point is None and school and school.location:
+            sp = school.location
+            school_point = {
+                "lat": float(sp.y),
+                "lng": float(sp.x),
+                "name": school.name,
+            }
+    if not pickups or not school_point:
+        return None
+
+    if trip.direction == Trip.Direction.TO_HOME:
+        # School out to each home; the last drop-off is the destination.
+        return {
+            "direction": trip.direction,
+            "origin": {**school_point, "label": school_point["name"]},
+            "waypoints": pickups[:-1],
+            "destination": {**pickups[-1], "label": "Drop-off"},
+        }
+    # Home(s) to school; the school is the destination.
+    return {
+        "direction": trip.direction,
+        "origin": {**pickups[0], "label": "Pickup"},
+        "waypoints": pickups[1:],
+        "destination": {**school_point, "label": school_point["name"]},
+    }
 
 
 def serialize_fleet_van(trip):
