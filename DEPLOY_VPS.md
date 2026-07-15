@@ -7,9 +7,10 @@ terminates TLS:
 
 ```
                          ┌──────────── host nginx (:80/:443, TLS) ───────────┐
-schoolrun.oddshoesdev.xyz│  /api /admin /health → 127.0.0.1:8010 (Django)    │
+schoolrun.oddshoesdev.xyz│  /api /health        → 127.0.0.1:8010 (Django)    │
                          │  /static /media      → /home/schoolrun/*          │
                          │  everything else      → 127.0.0.1:8020 (frontend)  │
+                         │  (/admin is the React ops console, not Django)     │
                          └────────────────────────────────────────────────────┘
      backend compose: schoolrun-web, schoolrun-celery, schoolrun-postgres, schoolrun-redis
      frontend compose: schoolrun-frontend
@@ -201,8 +202,9 @@ curl -s https://schoolrun.oddshoesdev.xyz/health/         # backend via TLS
 curl -sI https://schoolrun.oddshoesdev.xyz/               # frontend index
 ```
 
-Open `https://schoolrun.oddshoesdev.xyz/` (web app) and
-`https://schoolrun.oddshoesdev.xyz/admin/` (Django admin) in a browser.
+Open `https://schoolrun.oddshoesdev.xyz/` (web app) in a browser. The ops
+console lives at `/admin/` and is part of the React frontend — there is no
+separate Django admin.
 
 ---
 
@@ -223,6 +225,6 @@ docker compose exec -T schoolrun-postgres \
   pg_dump -U schoolrun schoolrun | gzip > /root/backups/schoolrun-$(date +%F).sql.gz
 ```
 
-If Django admin/login misbehaves over HTTPS (CSRF), the proxy is already sending
+If the API misbehaves over HTTPS (CSRF), the proxy is already sending
 `X-Forwarded-Proto`; add `SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")`
 to `main/settings.py` and redeploy.
