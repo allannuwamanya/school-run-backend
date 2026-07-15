@@ -120,6 +120,11 @@ urlpatterns = [
     path('admin/staff', admin_views.AdminStaffListView.as_view(), name='admin-staff'),
     path('admin/staff/<int:pk>', admin_views.AdminStaffDeleteView.as_view(), name='admin-staff-delete'),
     path('admin/staff/<int:pk>/toggle', admin_views.AdminStaffToggleView.as_view(), name='admin-staff-toggle'),
+    path(
+        'admin/staff/<int:pk>/super-admin',
+        admin_views.AdminStaffSuperAdminToggleView.as_view(),
+        name='admin-staff-super-admin-toggle',
+    ),
     path('admin/users', admin_views.AdminUserListView.as_view(), name='admin-users'),
     path(
         'admin/users/<int:pk>/set-password',

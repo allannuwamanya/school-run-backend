@@ -1075,6 +1075,37 @@ class AdminStaffToggleView(APIView):
         return ok(serialize_staff_row(user, request.user))
 
 
+class AdminStaffSuperAdminToggleView(APIView):
+    """Promotes an Admin to Super Admin, or demotes a Super Admin back to a
+    regular Admin. Gated like everything else in staff management — only an
+    existing Super Admin can grant or revoke the tier."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        if not is_super_admin(request.user):
+            return err("Only Super Admins can change another admin's tier.", 403)
+
+        user = get_object_or_404(CustomUser, pk=pk, role=CustomUser.Role.ADMIN)
+        if user.id == request.user.id:
+            return err("You can't change your own tier.", 400)
+        if user.is_superuser and not CustomUser.objects.filter(
+            role=CustomUser.Role.ADMIN, is_superuser=True
+        ).exclude(pk=user.pk).exists():
+            return err("Can't demote the last Super Admin.", 400)
+
+        user.is_superuser = not user.is_superuser
+        user.save(update_fields=["is_superuser"])
+        name = user.full_name or user.phone
+        log_action(
+            request,
+            "staff.promote" if user.is_superuser else "staff.demote",
+            f"{'Promoted' if user.is_superuser else 'Demoted'} {name} "
+            f"{'to' if user.is_superuser else 'from'} Super Admin",
+            "staff", user.id, name,
+        )
+        return ok(serialize_staff_row(user, request.user))
+
+
 class AdminStaffDeleteView(APIView):
     """Permanently removes an admin's login — for someone who's left the
     org, as opposed to AdminStaffToggleView's deactivate (a temporary
