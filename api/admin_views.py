@@ -1075,6 +1075,48 @@ class AdminStaffToggleView(APIView):
         return ok(serialize_staff_row(user, request.user))
 
 
+class AdminStaffDeleteView(APIView):
+    """Permanently removes an admin's login — for someone who's left the
+    org, as opposed to AdminStaffToggleView's deactivate (a temporary
+    access cut that keeps the account around). AdminActionLog entries the
+    deleted admin authored are untouched: `actor` is SET_NULL and
+    `actor_name` is already snapshotted, so the audit trail survives."""
+    permission_classes = [IsAdmin]
+
+    def delete(self, request, pk):
+        if not is_super_admin(request.user):
+            return err("Only Super Admins can remove admin accounts.", 403)
+
+        user = get_object_or_404(CustomUser, pk=pk, role=CustomUser.Role.ADMIN)
+        if user.id == request.user.id:
+            return err("You can't delete your own account.", 400)
+        if user.is_superuser and not CustomUser.objects.filter(
+            role=CustomUser.Role.ADMIN, is_superuser=True
+        ).exclude(pk=user.pk).exists():
+            return err("Can't delete the last Super Admin.", 400)
+
+        target_user_id = user.id
+        target_full_name = user.full_name or user.phone
+        target_phone = user.phone or ""
+
+        user.delete()
+
+        AccountDeletionLog.objects.create(
+            deleted_by=request.user,
+            deleted_by_name=request.user.full_name or request.user.phone,
+            target_user_id=target_user_id,
+            target_role=CustomUser.Role.ADMIN,
+            target_full_name=target_full_name,
+            target_phone=target_phone,
+        )
+        log_action(
+            request, "staff.delete",
+            f"Deleted admin {target_full_name}",
+            "staff", target_user_id, target_full_name,
+        )
+        return ok(None, 204)
+
+
 AUDIT_PAGE_SIZE = 50
 
 
